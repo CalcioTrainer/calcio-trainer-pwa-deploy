@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 // =============================
 //  Utils: Local Storage Helpers
 // =============================
-const LS_KEY = "aoo_app_user"; // unico oggetto con auth + profilo
+const LS_KEY = "aoo_app_user";
 
 function loadUser() {
   try {
@@ -70,7 +70,7 @@ const WORKOUT_SECTIONS = [
     key: "resistenza",
     label: "Resistenza",
     items: [
-      { id: 21, name: "Intermittente 10x(30" + "/30")", duration: "10 min" },
+      { id: 21, name: "Intermittente 10x(30"/30")", duration: "10 min" },
       { id: 22, name: "Navette 10-20-30", duration: "12 min" },
     ],
   },
@@ -96,16 +96,14 @@ const WORKOUT_SECTIONS = [
 //  App
 // =============================
 export default function App() {
-  const [user, setUser] = useState(null); // {email, password, name, surname, ...}
-  const [screen, setScreen] = useState("login"); // login | workouts | area
+  const [user, setUser] = useState(null);
+  const [screen, setScreen] = useState("login");
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Carica eventuale utente
   useEffect(() => {
     const u = loadUser();
     if (u) {
       setUser(u);
-      // Se profilo incompleto → porta in area personale per compilare
       if (!isProfileComplete(u)) {
         setScreen("area");
       } else {
@@ -114,7 +112,6 @@ export default function App() {
     }
   }, []);
 
-  // Sincronizza LS ad ogni modifica user
   useEffect(() => {
     if (user) saveUser(user);
   }, [user]);
@@ -125,7 +122,6 @@ export default function App() {
     setScreen("login");
   };
 
-  // Header con titolo + hamburger
   const Header = ({ title }) => (
     <div style={styles.header}>
       <div style={styles.headerLeft}>⚽ {title}</div>
@@ -134,7 +130,10 @@ export default function App() {
           <button
             aria-label="Menu"
             title="Menu"
-            onClick={() => setMenuOpen((v) => !v)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpen((v) => !v);
+            }}
             style={styles.hamburger}
           >
             <span style={styles.burgerLine} />
@@ -156,13 +155,12 @@ export default function App() {
   );
 
   return (
-    <div style={styles.app} onClick={() => menuOpen && setMenuOpen(false)}>
+    <div style={styles.app}>
       {screen === "login" && (
         <>
           <Header title="Benvenuto" />
           <Auth onLogin={(u) => {
             setUser(u);
-            // Dopo accesso: se profilo incompleto → Area, altrimenti Allenamenti
             if (!isProfileComplete(u)) setScreen("area");
             else setScreen("workouts");
           }} />
@@ -174,9 +172,6 @@ export default function App() {
           <Header title={`Allenamenti`} />
           <div style={styles.container}>
             <WorkoutsTabs />
-            <div style={{ marginTop: 24, color: COLORS.muted, fontSize: 13 }}>
-              Suggerimento: usa il menu ≡ in alto a destra per accedere all'Area Personale o inviare un feedback.
-            </div>
             <Footer onLogout={handleLogout} />
           </div>
         </>
@@ -190,7 +185,6 @@ export default function App() {
               user={user}
               onSave={(updated) => {
                 setUser(updated);
-                // Se era incompleto e ora completo, non forzo cambio pagina; resta in area.
               }}
             />
             <Footer onLogout={handleLogout} />
@@ -225,12 +219,11 @@ function Auth({ onLogin }) {
         password: form.password,
         name: form.name.trim(),
         surname: form.surname.trim(),
-        // campi profilo (verranno richiesti appena dopo il login se mancanti)
-        height: existing?.height ?? "",
-        weight: existing?.weight ?? "",
-        birthdate: existing?.birthdate ?? "",
-        role11: existing?.role11 ?? "",
-        role5: existing?.role5 ?? "",
+        height: "",
+        weight: "",
+        birthdate: "",
+        role11: "",
+        role5: "",
       };
       saveUser(newUser);
       onLogin(newUser);
@@ -275,7 +268,7 @@ function Auth({ onLogin }) {
 }
 
 function PersonalArea({ user, onSave }) {
-  const [edit, setEdit] = useState(!isProfileComplete(user)); // se incompleto → entra direttamente in edit
+  const [edit, setEdit] = useState(!isProfileComplete(user));
   const [form, setForm] = useState(user || {});
 
   useEffect(() => {
@@ -284,7 +277,6 @@ function PersonalArea({ user, onSave }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // validazione minima
     if (!form.name || !form.surname || !form.height || !form.weight || !form.birthdate || !form.role11 || !form.role5) {
       alert("Compila tutti i campi del profilo");
       return;
@@ -406,10 +398,6 @@ function MenuPopup({ onClose, onArea }) {
   );
 }
 
-// =============================
-//  UI Atomi
-// =============================
-
 function Input({ label, value, onChange, type = "text" }) {
   return (
     <label style={styles.field}>
@@ -430,223 +418,3 @@ function Select({ label, value, onChange, options }) {
       <span style={styles.fieldLabel}>{label}</span>
       <select value={value} onChange={(e) => onChange?.(e.target.value)} style={styles.input}>
         <option value="" disabled>
-          Seleziona…
-        </option>
-        {options.map((op) => (
-          <option key={op} value={op}>
-            {op}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function Info({ label, value }) {
-  return (
-    <div style={styles.infoBox}>
-      <div style={{ color: COLORS.muted, fontSize: 12 }}>{label}</div>
-      <div style={{ fontWeight: 600 }}>{value || "-"}</div>
-    </div>
-  );
-}
-
-function Footer({ onLogout }) {
-  return (
-    <div style={{ marginTop: 24, display: "flex", gap: 12, justifyContent: "center" }}>
-      <button style={styles.buttonTertiary} onClick={onLogout}>
-        Esci
-      </button>
-    </div>
-  );
-}
-
-// =============================
-//  Helpers
-// =============================
-function isProfileComplete(u) {
-  if (!u) return false;
-  const required = ["name", "surname", "email", "height", "weight", "birthdate", "role11", "role5"];
-  return required.every((k) => u[k] && String(u[k]).trim() !== "");
-}
-
-// =============================
-//  Stili inline (tema sportivo verde/bianco)
-// =============================
-const styles = {
-  app: {
-    minHeight: "100vh",
-    background: COLORS.bg,
-    color: COLORS.text,
-  },
-  container: {
-    maxWidth: 980,
-    margin: "0 auto",
-    padding: 20,
-    display: "flex",
-    flexDirection: "column",
-    gap: 16,
-  },
-  header: {
-    position: "sticky",
-    top: 0,
-    zIndex: 10,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "12px 16px",
-    background: COLORS.card,
-    borderBottom: `1px solid ${COLORS.border}`,
-  },
-  headerLeft: { fontWeight: 700, color: COLORS.brandDark },
-  headerRight: { position: "relative", display: "flex", alignItems: "center", gap: 8 },
-  hamburger: {
-    width: 40,
-    height: 36,
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 4,
-    borderRadius: 10,
-    background: COLORS.card,
-    border: `1px solid ${COLORS.border}`,
-    cursor: "pointer",
-  },
-  burgerLine: { width: 18, height: 2, background: COLORS.text, borderRadius: 2 },
-
-  popup: {
-    position: "absolute",
-    top: 44,
-    right: 0,
-    background: COLORS.card,
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 12,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
-    overflow: "hidden",
-    minWidth: 200,
-  },
-  popupItem: {
-    width: "100%",
-    textAlign: "left",
-    background: "transparent",
-    border: "none",
-    padding: "10px 14px",
-    cursor: "pointer",
-    color: COLORS.text,
-  },
-
-  title: { color: COLORS.brandDark, margin: 0 },
-  card: {
-    background: COLORS.card,
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 16,
-    padding: 16,
-  },
-  authCard: {
-    maxWidth: 420,
-    margin: "40px auto",
-    background: COLORS.card,
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 16,
-    padding: 18,
-  },
-  row: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
-  field: { display: "flex", flexDirection: "column", gap: 6 },
-  fieldLabel: { fontSize: 13, color: COLORS.muted },
-  input: {
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: `1px solid ${COLORS.border}`,
-    outline: "none",
-    background: "#fff",
-  },
-  infoBox: {
-    padding: 12,
-    borderRadius: 12,
-    background: "#fff",
-    border: `1px solid ${COLORS.border}`,
-  },
-
-  tabsBar: {
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-    borderBottom: `1px solid ${COLORS.border}`,
-    paddingBottom: 8,
-  },
-  tabBtn: {
-    padding: "8px 12px",
-    borderRadius: 999,
-    border: `1px solid ${COLORS.border}`,
-    background: "#fff",
-    cursor: "pointer",
-  },
-  tabBtnActive: {
-    background: COLORS.brand,
-    color: "#fff",
-    borderColor: COLORS.brand,
-    fontWeight: 600,
-  },
-  workoutCard: {
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 14,
-    background: "#fff",
-    padding: 12,
-    display: "flex",
-    gap: 10,
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  buttonPrimary: {
-    padding: "10px 14px",
-    borderRadius: 12,
-    border: "none",
-    background: COLORS.brand,
-    color: "#fff",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-  buttonSecondary: {
-    padding: "8px 12px",
-    borderRadius: 12,
-    border: `1px solid ${COLORS.border}`,
-    background: "#fff",
-    cursor: "pointer",
-    fontWeight: 600,
-  },
-  buttonSecondarySmall: {
-    padding: "6px 10px",
-    borderRadius: 10,
-    border: `1px solid ${COLORS.border}`,
-    background: "#fff",
-    cursor: "pointer",
-    fontWeight: 600,
-  },
-  buttonTertiary: {
-    padding: "8px 10px",
-    borderRadius: 10,
-    border: `1px solid ${COLORS.border}`,
-    background: "transparent",
-    cursor: "pointer",
-  },
-  linkBtn: {
-    background: "transparent",
-    color: COLORS.brand,
-    border: "none",
-    cursor: "pointer",
-    textDecoration: "underline",
-  },
-  linkBtnLike: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "8px 12px",
-    borderRadius: 999,
-    border: `1px solid ${COLORS.border}`,
-    background: "#fff",
-    color: COLORS.text,
-    textDecoration: "none",
-  },
-};
