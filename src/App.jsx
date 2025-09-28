@@ -1,619 +1,303 @@
-import React, { useEffect, useMemo, useState } from "react";
+// --- INIZIO FILE --- (PARTE 1/3)
+import { useEffect, useMemo, useState } from "react";
 
-// App Allenamenti Calcio a Casa — tutto in un singolo file React
-// Requisiti: nessun backend. Salvataggio su localStorage. Solo palla.
-// Lingua: Italiano
+/**
+ * Calcio Trainer — versione con video dimostrativi sotto la descrizione
+ * Tema: BLU
+ * Lingua: Italiano
+ */
 
-// Utili
-const ruoli11 = [
-  "Portiere",
-  "Terzino Destro",
-  "Difensore Centrale",
-  "Terzino Sinistro",
-  "Esterno Destro",
-  "Mezzala Destra",
-  "Regista/Mediano",
-  "Mezzala Sinistra",
-  "Esterno Sinistro",
-  "Seconda Punta/Trequartista",
-  "Centravanti",
-];
+// 5 esercizi generici (tecnica + resistenza) con video segnaposto
+const VIDEO_PLACEHOLDER = "https://www.youtube.com/embed/Ll7J3cPjDmU";
 
-const ruoli5 = [
-  "Portiere",
-  "Difensore/Fisso",
-  "Laterale",
-  "Universale",
-  "Pivot",
-];
-
-const initialProfile = {
-  nome: "",
-  cognome: "",
-  dataNascita: "",
-  altezza: "",
-  peso: "",
-  ruolo11: "",
-  ruolo5: "",
-  squadra: "",
-};
-
-const STORAGE_KEY = "allenamenti-casa-profile-v1";
-const PLAN_KEY = "allenamenti-casa-plan-v1";
-
-// Libreria di esercizi SOLO PALLA in spazi ridotti (casa/cortile/garage)
-// Ogni esercizio ha: id, titolo, descrizione, durata consigliata, focus, difficoltà
 const DRILLS = [
   {
-    id: "ball-mastery-1",
-    titolo: "Ball Mastery Base",
+    titolo: "Guida palla veloce",
     descrizione:
-      "Tocchi rapidi destro/sinistro sul posto, punta-interno/esterno, suola avanti/indietro.",
-    durata: 8,
-    focus: ["tecnica", "controllo"],
-    difficolta: 1,
-  },
-  {
-    id: "ball-mastery-2",
-    titolo: "Tocchi con Suola & Finte",
-    descrizione:
-      "Scivolate di suola laterali, finte semplici (step-over singolo), cambi direzione stretti.",
-    durata: 8,
-    focus: ["tecnica", "dribbling"],
+      "Guida la palla avanti e indietro in linea retta alla massima velocità controllata. Mantieni tocchi corti.",
+    durataMin: 1, // minuti
+    focus: ["tecnica", "resistenza"],
     difficolta: 2,
+    video: VIDEO_PLACEHOLDER,
   },
   {
-    id: "juggling",
-    titolo: "Palleggi Progressivi",
+    titolo: "Stop + cambio direzione",
     descrizione:
-      "Palleggi alternando piedi, cosce, testa se possibile. Serie a obiettivo.",
-    durata: 10,
-    focus: ["coordinazione", "primo controllo"],
+      "Conduci palla, esegui uno stop secco e cambia direzione a 90° o 180°. Alterna piede destro/sinistro.",
+    durataMin: 1,
+    focus: ["agilità", "tecnica"],
     difficolta: 2,
+    video: VIDEO_PLACEHOLDER,
   },
   {
-    id: "wall-pass",
-    titolo: "Passaggi contro il muro",
+    titolo: "Palleggio tecnico",
     descrizione:
-      "Passaggi a una/due tocchi contro una parete (o mobile robusto), controllo orientato.",
-    durata: 12,
-    focus: ["passaggio", "primo controllo"],
+      "Palleggia con entrambi i piedi, cosce e testa. Punta a serie continue mantenendo controllo e ritmo.",
+    durataMin: 1,
+    focus: ["coordinazione", "tocchi"],
+    difficolta: 3,
+    video: VIDEO_PLACEHOLDER,
+  },
+  {
+    titolo: "Slalom tra coni (immaginari)",
+    descrizione:
+      "Immagina 6 coni distanziati 1,5 m. Serpentina stretta mantenendo la palla vicina al piede.",
+    durataMin: 1,
+    focus: ["dribbling", "controllo"],
     difficolta: 2,
+    video: VIDEO_PLACEHOLDER,
   },
   {
-    id: "tight-dribble",
-    titolo: "Dribbling in spazio ridotto",
+    titolo: "Scatti brevi con palla",
     descrizione:
-      "Slalom tra 4-6 oggetti (libri/bottiglie) a 50-80cm, cambi di ritmo e finta corpo.",
-    durata: 10,
-    focus: ["dribbling", "agilità"],
-    difficolta: 2,
-  },
-  {
-    id: "turns",
-    titolo: "Giri & Protezione palla",
-    descrizione:
-      "Ricezione immaginaria, protezione con corpo, giri (Cruyff, esterno, suola) e ripartenza.",
-    durata: 8,
-    focus: ["tecnica", "forza specifica"],
-    difficolta: 2,
-  },
-  {
-    id: "finishing-no-goal",
-    titolo: "Finalizzazione senza porta",
-    descrizione:
-      "Controllo + tiro simulato verso un bersaglio a terra/parete (precisione sul target).",
-    durata: 6,
-    focus: ["tiro", "coordinazione"],
-    difficolta: 1,
-  },
-  {
-    id: "keeper-footwork",
-    titolo: "Portiere: footwork + presa simulata",
-    descrizione:
-      "Passetti laterali, affondi controllati, lanci palla in alto e presa al petto.",
-    durata: 8,
-    focus: ["portiere", "coordinazione"],
-    difficolta: 2,
-  },
-  {
-    id: "conditioning-ball",
-    titolo: "Condizionamento con palla",
-    descrizione: "30\" lavoro / 30\" pausa di guida palla veloce, stop, cambio direzione.",
-
-    durata: 8,
-    focus: ["resistenza", "ritmo"],
-    difficolta: 2,
-  },
-  {
-    id: "mobility",
-    titolo: "Mobilità con palla",
-    descrizione:
-      "Circonduzioni caviglia con palla, affondi leggeri con controllo palla, mobilità anca.",
-    durata: 6,
-    focus: ["mobilità", "prevenzione"],
-    difficolta: 1,
+      "5–6 scatti da 10–15 m con palla, rientro al passo. Cura primo controllo e accelerazione.",
+    durataMin: 1,
+    focus: ["velocità", "resistenza"],
+    difficolta: 3,
+    video: VIDEO_PLACEHOLDER,
   },
 ];
 
-// Suggerimenti per ruolo
-const ROLE_FOCUS = {
-  Portiere: ["portiere", "passaggio", "coordinazione"],
-  "Terzino Destro": ["passaggio", "dribbling", "resistenza"],
-  "Terzino Sinistro": ["passaggio", "dribbling", "resistenza"],
-  "Difensore Centrale": ["passaggio", "primo controllo", "forza specifica"],
-  "Esterno Destro": ["dribbling", "tiro", "ritmo"],
-  "Esterno Sinistro": ["dribbling", "tiro", "ritmo"],
-  "Mezzala Destra": ["tecnica", "resistenza", "passaggio"],
-  "Mezzala Sinistra": ["tecnica", "resistenza", "passaggio"],
-  "Regista/Mediano": ["passaggio", "primo controllo", "tecnica"],
-  "Seconda Punta/Trequartista": ["dribbling", "tiro", "primo controllo"],
-  Centravanti: ["tiro", "protezione palla", "primo controllo"],
-  // Calcio a 5
-  "Difensore/Fisso": ["passaggio", "protezione palla", "primo controllo"],
-  Laterale: ["dribbling", "passaggio", "ritmo"],
-  Universale: ["tecnica", "resistenza", "primo controllo"],
-  Pivot: ["protezione palla", "tiro", "passaggio"],
+// Helpers
+const sec = (m) => Math.max(1, Math.round(m * 60));
+const formatTime = (s) => {
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
 };
+// --- PARTE 2/3 ---
+export default function App() {
+  // Stato allenamento
+  const [started, setStarted] = useState(false);
+  const [current, setCurrent] = useState(0);
+  const [running, setRunning] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [finished, setFinished] = useState(false);
 
-function classNames(...c) {
-  return c.filter(Boolean).join(" ");
-}
+  const totaleEsercizi = DRILLS.length;
+  const drill = useMemo(() => DRILLS[current], [current]);
 
-function secondsToMMSS(total) {
-  const m = Math.floor(total / 60)
-    .toString()
-    .padStart(2, "0");
-  const s = Math.floor(total % 60)
-    .toString()
-    .padStart(2, "0");
-  return `${m}:${s}`;
-}
+  // Avvia allenamento
+  const startWorkout = () => {
+    setStarted(true);
+    setFinished(false);
+    setCurrent(0);
+    setSecondsLeft(sec(DRILLS[0].durataMin));
+    setRunning(true);
+  };
 
-export default function AppAllenamentiCasa() {
-  const [profile, setProfile] = useState(initialProfile);
-  const [plan, setPlan] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [activeTimer, setActiveTimer] = useState(null); // {drillId, remainingSec}
+  // Pausa/continua
+  const togglePause = () => setRunning((r) => !r);
 
-  // Carica da localStorage
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) setProfile(JSON.parse(saved));
-      const savedPlan = localStorage.getItem(PLAN_KEY);
-      if (savedPlan) setPlan(JSON.parse(savedPlan));
-    } catch {}
-  }, []);
-
-  // Salva profilo
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-    } catch {}
-  }, [profile]);
-
-  // Salva piano
-  useEffect(() => {
-    try {
-      if (plan) localStorage.setItem(PLAN_KEY, JSON.stringify(plan));
-    } catch {}
-  }, [plan]);
-
-  const age = useMemo(() => {
-    if (!profile.dataNascita) return null;
-    const dob = new Date(profile.dataNascita);
-    if (isNaN(dob.getTime())) return null;
-    const diff = Date.now() - dob.getTime();
-    const years = Math.floor(diff / (365.25 * 24 * 3600 * 1000));
-    return years;
-  }, [profile.dataNascita]);
-
-  function handleChange(e) {
-    const { name, value } = e.target;
-    setProfile((p) => ({ ...p, [name]: value }));
-  }
-
-  function validateProfile(p) {
-    const errors = [];
-    if (!p.nome) errors.push("Nome obbligatorio");
-    if (!p.cognome) errors.push("Cognome obbligatorio");
-    if (!p.dataNascita) errors.push("Data di nascita obbligatoria");
-    if (!p.altezza) errors.push("Altezza obbligatoria");
-    if (!p.peso) errors.push("Peso obbligatorio");
-    return errors;
-  }
-
-  function pickDrillsByFocus(focusArray, count = 4) {
-    // Scegli esercizi che matchano il focus
-    const pool = DRILLS.filter((d) =>
-      d.focus.some((f) => focusArray.some((x) => f.includes(x) || x.includes(f)))
-    );
-    const shuffled = [...pool].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, Math.min(count, shuffled.length));
-  }
-
-  function baseWarmUp() {
-    return [
-      {
-        id: "warmup-1",
-        titolo: "Riscaldamento tecnico",
-        descrizione:
-          "Guida palla leggera + mobilità (caviglie/anche) con palla. Ritmo basso.",
-        durata: 6,
-      },
-    ];
-  }
-
-  function baseCoolDown() {
-    return [
-      {
-        id: "cooldown-1",
-        titolo: "Defaticamento & mobilità",
-        descrizione: "Respirazione, mobilità con palla, stretching dolce.",
-        durata: 5,
-      },
-    ];
-  }
-
-  function generatePlan() {
-    const errs = validateProfile(profile);
-    if (errs.length) {
-      alert("Completa i campi: \n- " + errs.join("\n- "));
-      return;
+  // Prossimo esercizio
+  const nextDrill = () => {
+    const next = current + 1;
+    if (next < DRILLS.length) {
+      setCurrent(next);
+      setSecondsLeft(sec(DRILLS[next].durataMin));
+      setRunning(true);
+    } else {
+      // Fine allenamento
+      setRunning(false);
+      setFinished(true);
     }
+  };
 
-    setLoading(true);
-    // Logica semplice: 4 sessioni/settimana x ~35-45' ciascuna
-    const ruoloFocus11 = ROLE_FOCUS[profile.ruolo11] || [];
-    const ruoloFocus5 = ROLE_FOCUS[profile.ruolo5] || [];
+  // Termina
+  const stopWorkout = () => {
+    setStarted(false);
+    setRunning(false);
+    setFinished(false);
+    setSecondsLeft(0);
+    setCurrent(0);
+  };
 
-    // Priorità: se è Portiere in uno dei due, includi esercizio specifico
-    const isGK = profile.ruolo11 === "Portiere" || profile.ruolo5 === "Portiere";
-
-    const mainFocus = [...new Set([...ruoloFocus11, ...ruoloFocus5])];
-    if (mainFocus.length === 0) mainFocus.push("tecnica", "primo controllo");
-
-    const sessioni = [];
-    for (let i = 1; i <= 4; i++) {
-      let drills = pickDrillsByFocus(mainFocus, 3);
-      // Aggiungi condizionamento e ball mastery sempre
-      const mastery = DRILLS.find((d) => d.id === "ball-mastery-1");
-      const cond = DRILLS.find((d) => d.id === "conditioning-ball");
-      drills = [mastery, ...drills.filter(Boolean)];
-      if (isGK) {
-        const gk = DRILLS.find((d) => d.id === "keeper-footwork");
-        if (gk && !drills.find((x) => x.id === gk.id)) drills.push(gk);
-      }
-      if (cond && !drills.find((x) => x.id === cond.id)) drills.push(cond);
-
-      // Durata target in base all'età
-      const target = age && age < 13 ? 30 : 40; // minuti
-      const totalMain = drills.reduce((s, d) => s + d.durata, 0);
-      // Se supera target, riduci gli ultimi esercizi
-      let over = totalMain - target + 10; // +10' per warmup/cooldown
-      const normalized = drills.map((d) => ({ ...d }));
-      if (over > 0) {
-        for (let k = normalized.length - 1; k >= 0 && over > 0; k--) {
-          const cut = Math.min(3, normalized[k].durata - 5);
-          if (cut > 0) {
-            normalized[k].durata -= cut;
-            over -= cut;
-          }
+  // Timer
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => {
+      setSecondsLeft((s) => {
+        if (s <= 1) {
+          // passa automaticamente al prossimo
+          setTimeout(nextDrill, 0);
+          return 0;
         }
-      }
-
-      sessioni.push({
-        nome: `Sessione ${i}`,
-        warmup: baseWarmUp(),
-        main: normalized,
-        cooldown: baseCoolDown(),
-      });
-    }
-
-    const nuovoPiano = {
-      creatoIl: new Date().toISOString(),
-      giocatore: profile,
-      frequenzaSettimanale: 4,
-      sessioni,
-      note:
-        "Esegui 4 sessioni a settimana. Recupero 24-48h tra sessioni intense. Tutto con sola palla. Adatta spazi e sicurezze di casa.",
-    };
-
-    setPlan(nuovoPiano);
-    setLoading(false);
-  }
-
-  function exportJSON() {
-    const blob = new Blob([JSON.stringify({ profile, plan }, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `piano-allenamento-${profile.nome || "giocatore"}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function resetAll() {
-    if (!confirm("Sicuro di cancellare profilo e piano?")) return;
-    setProfile(initialProfile);
-    setPlan(null);
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(PLAN_KEY);
-  }
-
-  // Timer semplice per singolo esercizio
-  useEffect(() => {
-    if (!activeTimer) return;
-    const t = setInterval(() => {
-      setActiveTimer((cur) => {
-        if (!cur) return null;
-        if (cur.remainingSec <= 1) return null;
-        return { ...cur, remainingSec: cur.remainingSec - 1 };
+        return s - 1;
       });
     }, 1000);
-    return () => clearInterval(t);
-  }, [activeTimer]);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running, current]);
 
-  function startTimer(drill) {
-    setActiveTimer({ drillId: drill.id, remainingSec: drill.durata * 60 });
-  }
+  // Progress bar in secondi rimanenti
+  const progress = useMemo(() => {
+    const total = sec(drill?.durataMin ?? 1);
+    return total ? Math.max(0, Math.min(100, ((total - secondsLeft) / total) * 100)) : 0;
+  }, [drill, secondsLeft]);
 
-  function stopTimer() {
-    setActiveTimer(null);
-  }
+  // Card esercizio (lista + dettaglio)
+  const DrillCard = ({ item, index, compact = false }) => (
+    <div className="bg-white rounded-2xl shadow-md border border-blue-100 p-4 md:p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-lg md:text-xl font-semibold text-blue-700">
+          {index != null && <span className="mr-2 text-blue-500">{index + 1}.</span>}
+          {item.titolo}
+        </h3>
+        <span className="text-xs md:text-sm px-2 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-100">
+          {item.durataMin}′
+        </span>
+      </div>
 
-  function printPlan() {
-    window.print();
-  }
+      <p className="mt-2 text-gray-700">{item.descrizione}</p>
 
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
-      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Allenamenti Calcio a Casa (solo palla)</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={generatePlan}
-              className="px-3 py-2 rounded-2xl bg-blue-600 text-white shadow hover:bg-blue-700"
+      {/* Player video responsive sotto la descrizione */}
+      <div className="mt-3 aspect-video rounded-xl overflow-hidden border border-gray-200">
+        <iframe
+          src={item.video}
+          className="w-full h-full"
+          title={`Video: ${item.titolo}`}
+          loading="lazy"
+          allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen
+        />
+      </div>
+
+      {!compact && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {item.focus.map((f) => (
+            <span
+              key={f}
+              className="text-xs md:text-sm px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100"
             >
-              Genera Piano
-            </button>
-            <button
-              onClick={exportJSON}
-              className="px-3 py-2 rounded-2xl bg-slate-900 text-white shadow hover:bg-slate-800"
-            >
-              Esporta JSON
-            </button>
-            <button
-              onClick={printPlan}
-              className="px-3 py-2 rounded-2xl border shadow hover:bg-slate-100"
-            >
-              Stampa
-            </button>
-            <button
-              onClick={resetAll}
-              className="px-3 py-2 rounded-2xl border shadow hover:bg-red-50"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-5xl mx-auto p-4 grid md:grid-cols-2 gap-6 print:block">
-        {/* Colonna profilo */}
-        <section className="bg-white rounded-2xl shadow p-4 print:shadow-none print:border mb-4">
-          <h2 className="text-xl font-semibold mb-3">Profilo giocatore</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm">Nome</label>
-              <input
-                name="nome"
-                value={profile.nome}
-                onChange={handleChange}
-                className="w-full mt-1 px-3 py-2 rounded-xl border"
-                placeholder="Es. Marco"
-              />
-            </div>
-            <div>
-              <label className="text-sm">Cognome</label>
-              <input
-                name="cognome"
-                value={profile.cognome}
-                onChange={handleChange}
-                className="w-full mt-1 px-3 py-2 rounded-xl border"
-                placeholder="Es. Rossi"
-              />
-            </div>
-            <div>
-              <label className="text-sm">Data di nascita</label>
-              <input
-                type="date"
-                name="dataNascita"
-                value={profile.dataNascita}
-                onChange={handleChange}
-                className="w-full mt-1 px-3 py-2 rounded-xl border"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm">Altezza (cm)</label>
-                <input
-                  name="altezza"
-                  type="number"
-                  min="100"
-                  max="230"
-                  value={profile.altezza}
-                  onChange={handleChange}
-                  className="w-full mt-1 px-3 py-2 rounded-xl border"
-                  placeholder="Es. 175"
-                />
-              </div>
-              <div>
-                <label className="text-sm">Peso (kg)</label>
-                <input
-                  name="peso"
-                  type="number"
-                  min="30"
-                  max="200"
-                  value={profile.peso}
-                  onChange={handleChange}
-                  className="w-full mt-1 px-3 py-2 rounded-xl border"
-                  placeholder="Es. 68"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-sm">Ruolo (Calcio a 11)</label>
-              <select
-                name="ruolo11"
-                value={profile.ruolo11}
-                onChange={handleChange}
-                className="w-full mt-1 px-3 py-2 rounded-xl border"
-              >
-                <option value="">Seleziona…</option>
-                {ruoli11.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm">Ruolo (Calcio a 5)</label>
-              <select
-                name="ruolo5"
-                value={profile.ruolo5}
-                onChange={handleChange}
-                className="w-full mt-1 px-3 py-2 rounded-xl border"
-              >
-                <option value="">Seleziona…</option>
-                {ruoli5.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-sm">Squadra</label>
-              <input
-                name="squadra"
-                value={profile.squadra}
-                onChange={handleChange}
-                className="w-full mt-1 px-3 py-2 rounded-xl border"
-                placeholder="Es. ASD Città"
-              />
-            </div>
-          </div>
-
-          <div className="mt-3 text-sm text-slate-600">
-            Età stimata: <b>{age ?? "—"}</b> anni
-          </div>
-        </section>
-
-        {/* Colonna piano */}
-        <section className="bg-white rounded-2xl shadow p-4 print:shadow-none print:border">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Piano personalizzato</h2>
-            {loading && <span className="text-sm">Generazione…</span>}
-          </div>
-
-          {!plan ? (
-            <p className="text-slate-600 mt-2">
-              Compila il profilo e premi <b>Genera Piano</b> per creare 4 sessioni
-              settimanali (30–40'). Tutti gli esercizi richiedono solo la palla e
-              poco spazio.
-            </p>
-          ) : (
-            <div className="mt-3 space-y-6">
-              <div className="text-sm text-slate-600">
-                Creato il {new Date(plan.creatoIl).toLocaleString()} • Frequenza:{" "}
-                <b>{plan.frequenzaSettimanale}×/settimana</b>
-              </div>
-
-              {plan.sessioni.map((s, idx) => (
-                <div key={idx} className="rounded-2xl border p-3">
-                  <h3 className="font-semibold text-lg mb-2">{s.nome}</h3>
-
-                  <Blocchi titolo="Riscaldamento" lista={s.warmup} activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer} />
-                  <Blocchi titolo="Parte Principale" lista={s.main} activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer} />
-                  <Blocchi titolo="Defaticamento" lista={s.cooldown} activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer} />
-                </div>
-              ))}
-
-              <div className="text-sm text-slate-700">
-                <b>Note:</b> {plan.note}
-              </div>
-            </div>
-          )}
-        </section>
-      </main>
-
-      {/* Footer */}
-      <footer className="max-w-5xl mx-auto p-4 text-center text-xs text-slate-500">
-        Realizzato per allenamenti individuali a casa. Mantieni l'area libera da ostacoli.
-      </footer>
-
-      {/* Barra timer */}
-      {activeTimer && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white rounded-2xl shadow-lg px-4 py-3 flex items-center gap-3">
-          <div className="font-semibold">Timer</div>
-          <div className="px-2 py-1 rounded bg-slate-700">
-            {secondsToMMSS(activeTimer.remainingSec)}
-          </div>
-          <button onClick={stopTimer} className="px-3 py-1 rounded-xl bg-red-500 hover:bg-red-600">
-            Stop
-          </button>
+              {f}
+            </span>
+          ))}
+          <span className="ml-auto text-xs text-gray-500">Diff.: {item.difficolta}/5</span>
         </div>
       )}
     </div>
   );
-}
 
-function Blocchi({ titolo, lista, activeTimer, startTimer, stopTimer }) {
-  const total = (lista || []).reduce((s, d) => s + (d.durata || 0), 0);
+// --- FINE FILE (PARTE 3/3)
   return (
-    <div className="mb-3">
-      <div className="flex items-center justify-between">
-        <h4 className="font-medium mb-2">{titolo} ({total}' circa)</h4>
-      </div>
-      <div className="grid sm:grid-cols-2 gap-3">
-        {(lista || []).map((d) => (
-          <div key={d.id} className="border rounded-xl p-3">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+      {/* Header */}
+      <header className="sticky top-0 z-10 bg-white/70 backdrop-blur border-b border-blue-100">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-blue-700">
+            Calcio Trainer
+          </h1>
+          <button
+            onClick={started ? stopWorkout : startWorkout}
+            className={`px-3 md:px-4 py-2 rounded-xl text-white font-semibold shadow transition
+            ${started ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"}`}
+          >
+            {started ? "Termina" : "Inizia allenamento"}
+          </button>
+        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-4 py-6 md:py-8">
+        {/* Lista esercizi (prima di iniziare) */}
+        {!started && !finished && (
+          <section className="space-y-4">
+            <p className="text-gray-700">
+              Allena tecnica e resistenza a casa con solo il pallone. Seleziona{" "}
+              <span className="font-semibold">“Inizia allenamento”</span> per partire.
+            </p>
+            {DRILLS.map((d, i) => (
+              <DrillCard key={i} item={d} index={i} />
+            ))}
+          </section>
+        )}
+
+        {/* Allenamento in corso */}
+        {started && !finished && drill && (
+          <section className="space-y-4">
             <div className="flex items-center justify-between">
-              <div className="font-semibold">{d.titolo}</div>
-              <span className="text-xs text-slate-600">{d.durata}'</span>
+              <h2 className="text-xl md:text-2xl font-bold text-blue-700">
+                {current + 1}/{totaleEsercizi} • {drill.titolo}
+              </h2>
+              <span className="text-sm text-gray-600">Durata: {drill.durataMin}′</span>
             </div>
-            {d.focus && (
-              <div className="mt-1 text-xs text-slate-500">
-                Focus: {Array.isArray(d.focus) ? d.focus.join(", ") : d.focus}
+
+            <DrillCard item={drill} compact />
+
+            {/* Timer + controlli */}
+            <div className="mt-4 bg-white rounded-2xl shadow border border-blue-100 p-4 md:p-5">
+              <div className="flex items-center justify-between">
+                <div className="text-4xl md:text-5xl font-extrabold tabular-nums text-blue-700">
+                  {formatTime(secondsLeft)}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={togglePause}
+                    className="px-3 md:px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow"
+                  >
+                    {running ? "Pausa" : "Continua"}
+                  </button>
+                  <button
+                    onClick={nextDrill}
+                    className="px-3 md:px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold border border-blue-200"
+                  >
+                    Prossimo
+                  </button>
+                </div>
               </div>
-            )}
-            <p className="text-sm mt-2 text-slate-700">{d.descrizione}</p>
-            <div className="mt-3 flex items-center gap-2">
-              <button
-                onClick={() => startTimer(d)}
-                className={
-                  ["px-3 py-1 rounded-xl border",
-                   activeTimer?.drillId === d.id ? "bg-emerald-600 text-white border-emerald-600" : "hover:bg-slate-100"
-                  ].join(" ")
-                }
-              >
-                {activeTimer?.drillId === d.id ? "In corso…" : "Avvia timer"}
-              </button>
-              {activeTimer?.drillId === d.id && (
-                <button onClick={stopTimer} className="px-3 py-1 rounded-xl border hover:bg-slate-100">
-                  Termina
-                </button>
-              )}
+
+              {/* Barra progresso */}
+              <div className="mt-4 h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-600 transition-all"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+
+              {/* Pallini avanzamento */}
+              <div className="mt-3 flex gap-2">
+                {DRILLS.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-2 w-2 rounded-full ${
+                      i === current ? "bg-blue-700" : "bg-blue-200"
+                    }`}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          </section>
+        )}
+
+        {/* Fine allenamento */}
+        {finished && (
+          <section className="text-center space-y-3">
+            <h2 className="text-2xl md:text-3xl font-extrabold text-blue-700">
+              Allenamento completato! 💪
+            </h2>
+            <p className="text-gray-700">Ottimo lavoro. Vuoi ripeterlo o tornare alla lista?</p>
+            <div className="flex justify-center gap-2">
+              <button
+                onClick={startWorkout}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow"
+              >
+                Ripeti
+              </button>
+              <button
+                onClick={stopWorkout}
+                className="px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold border border-blue-200"
+              >
+                Torna alla lista
+              </button>
+            </div>
+          </section>
+        )}
+      </main>
+
+      <footer className="py-8 text-center text-xs text-gray-500">
+        © {new Date().getFullYear()} Calcio Trainer — PWA
+      </footer>
     </div>
   );
 }
+
