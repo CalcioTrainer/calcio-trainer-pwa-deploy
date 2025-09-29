@@ -2,16 +2,12 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * =========================================================
- *  App.jsx — versione completa (schema originale + richieste)
- *  - Login / Registrazione (Email+Password; in registrazione anche Nome+Cognome)
- *  - Dopo login/registrazione → HOME (non Area)
- *  - HOME: Benvenuto, Percorso di oggi, Allenati
- *  - Area Personale: ruoli FACOLTATIVI + Squadra FACOLTATIVA
- *  - Allenamenti:
- *      * TAB per sezione
- *      * Search bar in alto: se scrivi → filtra TUTTA la piattaforma e nasconde le TAB
- *  - Menu hamburger ≡: Home, Allenamenti, Area Personale, Feedback, Logout
- *  - Feedback email → appcalcio1@gmail.com
+ *  App.jsx — versione finale
+ *  - HOME: Search in alto → "Percorso di oggi" → lista allenamenti (uno sotto l'altro)
+ *  - Percorso di oggi: FACOLTATIVO; se mancano dati → alert; altrimenti allenamento personalizzato singolo
+ *  - Click allenamento: popup scelta durata → schermata con cronometro Start/Pausa/Stop
+ *  - Area Personale: tutti i dati modificabili; Ruolo/Durata/Frequenza FACOLTATIVI
+ *  - Menu ≡ invariato; Feedback via mailto:appcalcio1@gmail.com
  * =========================================================
  */
 
@@ -19,7 +15,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
    Local Storage helpers
 ============================== */
 const LS_KEY = "aoo_app_user";
-
 function loadUser() {
   try {
     const raw = localStorage.getItem(LS_KEY);
@@ -36,7 +31,7 @@ function clearUser() {
 }
 
 /* ==============================
-   Costanti UI & Dati
+   Tema & Costanti
 ============================== */
 const COLORS = {
   brand: "#25a244",
@@ -57,72 +52,148 @@ const ROLES_11 = [
   "Trequartista",
   "Attaccante",
 ];
-
 const ROLES_5 = ["Portiere", "Difensore", "Laterale", "Pivot", "Universale"];
 
+/* ===== Allenamenti (base) per sezione ===== */
 const WORKOUT_SECTIONS = [
   {
     key: "riscaldamento",
     label: "Riscaldamento",
     items: [
-      { id: 1, name: "Corsa leggera 10 minuti", duration: "10 min" },
-      { id: 2, name: "Mobilità articolare", duration: "8 min" },
-      { id: 3, name: "Esercizi dinamici", duration: "7 min" },
+      { id: 1, name: "Corsa leggera", base: 10 },
+      { id: 2, name: "Mobilità articolare", base: 8 },
+      { id: 3, name: "Attivazione dinamica", base: 7 },
+      { id: 4, name: "Skip + calciata", base: 6 },
+      { id: 5, name: "Aperture anche", base: 6 },
     ],
   },
   {
     key: "tecnica",
     label: "Tecnica",
     items: [
-      { id: 11, name: "Conduzione palla a zig-zag", duration: "12 min" },
-      { id: 12, name: "Passaggi di prima in coppia", duration: "10 min" },
-      { id: 13, name: "Controllo orientato + scarico", duration: "10 min" },
+      { id: 11, name: "Conduzione a zig-zag", base: 12 },
+      { id: 12, name: "Passaggi di prima", base: 10 },
+      { id: 13, name: "Controllo orientato", base: 10 },
+      { id: 14, name: "Stop + tiro rapido", base: 10 },
+      { id: 15, name: "Palla al palloncino (tecnica piede)", base: 8 },
+      { id: 16, name: "1-2 con compagno", base: 10 },
+      { id: 17, name: "Finta + conduzione", base: 10 },
+      { id: 18, name: "Rondos 4v2", base: 12 },
+      { id: 19, name: "Tecnica di guida palla", base: 10 },
+      { id: 20, name: "Domino passaggi a muro", base: 8 },
     ],
   },
   {
     key: "resistenza",
     label: "Resistenza",
     items: [
-      { id: 21, name: "Intermittente 10x(30\"/30\")", duration: "10 min" },
-      { id: 22, name: "Navette 10-20-30", duration: "12 min" },
+      { id: 21, name: "Intermittente 10x(30\"/30\")", base: 10 },
+      { id: 22, name: "Navette 10-20-30", base: 12 },
+      { id: 23, name: "Corsa continua", base: 15 },
+      { id: 24, name: "Ripetute 6x200m", base: 12 },
+      { id: 25, name: "Corsa progressiva", base: 12 },
+      { id: 26, name: "Potenziamento aerobico con palla", base: 12 },
+      { id: 27, name: "Fartlek breve", base: 12 },
     ],
   },
   {
     key: "tiro",
     label: "Tiro",
     items: [
-      { id: 31, name: "Tiro su scarico dal limite", duration: "12 min" },
-      { id: 32, name: "1 contro 1 + conclusione", duration: "10 min" },
+      { id: 31, name: "Tiro su scarico dal limite", base: 12 },
+      { id: 32, name: "1v1 + conclusione", base: 10 },
+      { id: 33, name: "Cross + inserimento", base: 10 },
+      { id: 34, name: "Tiro di prima su cross", base: 10 },
+      { id: 35, name: "Tiro a giro", base: 8 },
+      { id: 36, name: "Finalizzazione in area", base: 10 },
+    ],
+  },
+  {
+    key: "forza",
+    label: "Forza/Velocità",
+    items: [
+      { id: 41, name: "Scatti 10x20m", base: 8 },
+      { id: 42, name: "Balzi pliometrici", base: 8 },
+      { id: 43, name: "Skip alto + sprint", base: 8 },
+      { id: 44, name: "Circuito core (plank/side)", base: 10 },
+      { id: 45, name: "Affondi + squat a corpo libero", base: 10 },
+      { id: 46, name: "Andature tecniche con sprint", base: 8 },
     ],
   },
   {
     key: "defaticamento",
     label: "Defaticamento",
     items: [
-      { id: 41, name: "Corsa blanda 5 minuti", duration: "5 min" },
-      { id: 42, name: "Stretching globale", duration: "8 min" },
+      { id: 51, name: "Corsa blanda", base: 5 },
+      { id: 52, name: "Stretching globale", base: 8 },
+      { id: 53, name: "Respirazione + mobilità", base: 5 },
+      { id: 54, name: "Camminata + scarico", base: 6 },
+      { id: 55, name: "Stretching inferiori", base: 7 },
     ],
   },
 ];
+
+/* ===== Costruisco una lista unica di ~50 allenamenti ===== */
+function buildAllWorkouts() {
+  const base = WORKOUT_SECTIONS.flatMap((s) =>
+    s.items.map((it) => ({ ...it, section: s.key, sectionLabel: s.label }))
+  );
+  // Se meno di 50, riempio con varianti numerate
+  let all = [...base];
+  let id = 100;
+  const names = [
+    "Conduzione serpentina",
+    "Passaggi lunghi",
+    "Gioco di posizione 5v2",
+    "Torello 6v3",
+    "Finalizzazione su palla filtrante",
+    "Duelli 1v1 laterali",
+    "Duelli 2v2 in corsa",
+    "Cambio passo + tiro",
+    "Pressing coordinato",
+    "Uscita palla dal basso",
+    "Coperture difensive",
+    "Transizioni rapide",
+    "Rimessa laterale tattica",
+    "Passeggiata attiva",
+    "Equilibrio su bosu",
+  ];
+  while (all.length < 50) {
+    const name = names[(all.length - base.length) % names.length];
+    all.push({
+      id: id++,
+      name: `${name} ${Math.ceil((all.length - base.length + 1) / names.length)}`,
+      base: 9,
+      section: "extra",
+      sectionLabel: "Extra",
+    });
+  }
+  return all.slice(0, 50);
+}
+const ALL_WORKOUTS = buildAllWorkouts();
 
 /* ==============================
    App
 ============================== */
 export default function App() {
   const [user, setUser] = useState(null);
-  const [screen, setScreen] = useState("login"); // login | home | workouts | area
+  const [screen, setScreen] = useState("login"); // login | home | workouts | area | percorso | workout
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Carica utente all'avvio
+  // Stato per allenamento attivo e durata scelta
+  const [activeWorkout, setActiveWorkout] = useState(null);
+  const [activeDuration, setActiveDuration] = useState(null);
+  const [durationPickerFor, setDurationPickerFor] = useState(null); // workout per il popup
+
+  // Carica utente (se presente) e vai in HOME
   useEffect(() => {
     const u = loadUser();
     if (u) {
       setUser(u);
-      setScreen("home"); // vai sempre in HOME se utente presente
+      setScreen("home");
     }
   }, []);
 
-  // Sincronizza LS quando user cambia
   useEffect(() => {
     if (user) saveUser(user);
   }, [user]);
@@ -179,6 +250,7 @@ export default function App() {
     </div>
   );
 
+  // Navigazione principale
   return (
     <div style={styles.app}>
       {screen === "login" && (
@@ -188,7 +260,7 @@ export default function App() {
             <Auth
               onLogin={(u) => {
                 setUser(u);
-                setScreen("home"); // dopo login/registrazione vai in HOME
+                setScreen("home");
               }}
             />
           </div>
@@ -199,10 +271,24 @@ export default function App() {
         <>
           <Header title={`Benvenuto${user?.name ? ` ${user.name}` : ""}!`} />
           <div style={styles.container}>
-            <HomeScreen
+            <HomeScreenNew
               user={user}
-              onAllenati={goWorkouts}
               onAreaPersonale={goArea}
+              onPercorso={() => {
+                // Percorso FACOLTATIVO: se mancano dati → alert e rimango in HOME
+                const hasSomeData =
+                  (user?.role11 || user?.role5 || null) ||
+                  user?.preferredDuration ||
+                  user?.preferredFrequency;
+                if (!hasSomeData) {
+                  alert(
+                    "Per generare il tuo percorso personalizzato, completa i dati nell’Area Personale (ruolo / durata / frequenza). Oppure continua ad allenarti liberamente dalla lista!"
+                  );
+                  return;
+                }
+                setScreen("percorso");
+              }}
+              onStartWorkout={(w) => setDurationPickerFor(w)}
             />
             <Footer onLogout={handleLogout} />
           </div>
@@ -213,7 +299,10 @@ export default function App() {
         <>
           <Header title="Allenamenti" />
           <div style={styles.container}>
-            <WorkoutsWithSearch />
+            <WorkoutsList
+              workouts={ALL_WORKOUTS}
+              onStart={(w) => setDurationPickerFor(w)}
+            />
             <Footer onLogout={handleLogout} />
           </div>
         </>
@@ -225,186 +314,386 @@ export default function App() {
           <div style={styles.container}>
             <PersonalArea
               user={user}
-              onSave={(updated) => {
-                setUser(updated);
-              }}
+              onSave={(updated) => setUser(updated)}
             />
             <Footer onLogout={handleLogout} />
           </div>
         </>
+      )}
+
+      {screen === "percorso" && (
+        <>
+          <Header title="Percorso di oggi" />
+          <div style={styles.container}>
+            <PercorsoOggi
+              user={user}
+              onStart={(w) => setDurationPickerFor(w)}
+              onBack={goHome}
+            />
+          </div>
+        </>
+      )}
+
+      {screen === "workout" && activeWorkout && (
+        <>
+          <Header title="Allenamento in corso" />
+          <div style={styles.container}>
+            <WorkoutRunner
+              workout={activeWorkout}
+              minutes={activeDuration}
+              onExit={() => {
+                setActiveWorkout(null);
+                setActiveDuration(null);
+                setScreen("home");
+              }}
+            />
+          </div>
+        </>
+      )}
+
+      {/* Popup selezione durata */}
+      {durationPickerFor && (
+        <DurationPicker
+          onClose={() => setDurationPickerFor(null)}
+          onChoose={(mins) => {
+            setActiveWorkout(durationPickerFor);
+            setActiveDuration(mins);
+            setDurationPickerFor(null);
+            setScreen("workout");
+          }}
+        />
       )}
     </div>
   );
 }
 
 /* ==============================
-   Componenti: Auth (Login/Registrazione)
+   HOME nuova (search + percorso + lista unica)
 ============================== */
-function Auth({ onLogin }) {
-  const [isRegister, setIsRegister] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    surname: "",
-    email: "",
-    password: "",
-  });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!form.email || !form.password) {
-      alert("Email e password sono obbligatorie");
-      return;
-    }
-
-    const existing = loadUser();
-
-    if (isRegister) {
-      // Registrazione: includo già Nome + Cognome
-      const newUser = {
-        email: form.email.trim(),
-        password: form.password,
-        name: form.name.trim(),
-        surname: form.surname.trim(),
-        // Campi profilo (compilabili dopo in Area)
-        height: "",
-        weight: "",
-        birthdate: "",
-        team: "",
-        role11: "", // facoltativo
-        role5: "",  // facoltativo
-      };
-      saveUser(newUser);
-      onLogin(newUser);
-    } else {
-      if (!existing) {
-        alert("Nessun utente registrato. Crea un account.");
-        return;
-      }
-      if (
-        existing.email === form.email.trim() &&
-        existing.password === form.password
-      ) {
-        onLogin(existing);
-      } else {
-        alert("Credenziali errate");
-      }
-    }
-  };
+function HomeScreenNew({ user, onPercorso, onStartWorkout }) {
+  const [query, setQuery] = useState("");
+  const list = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return ALL_WORKOUTS;
+    return ALL_WORKOUTS.filter((w) => w.name.toLowerCase().includes(q));
+  }, [query]);
 
   return (
-    <div style={styles.authCard}>
-      <h2 style={styles.title}>{isRegister ? "Registrazione" : "Accesso"}</h2>
-      <form
-        onSubmit={handleSubmit}
-        style={{ display: "flex", flexDirection: "column", gap: 12 }}
-      >
-        {isRegister && (
-          <div style={styles.row}>
-            <Input
-              label="Nome"
-              value={form.name}
-              onChange={(v) => setForm({ ...form, name: v })}
-            />
-            <Input
-              label="Cognome"
-              value={form.surname}
-              onChange={(v) => setForm({ ...form, surname: v })}
-            />
-          </div>
-        )}
-        <Input
-          label="Email"
-          type="email"
-          value={form.email}
-          onChange={(v) => setForm({ ...form, email: v })}
-        />
-        <Input
-          label="Password"
-          type="password"
-          value={form.password}
-          onChange={(v) => setForm({ ...form, password: v })}
-        />
-        <button type="submit" style={styles.buttonPrimary}>
-          {isRegister ? "Crea account" : "Entra"}
-        </button>
-      </form>
+    <div style={styles.card}>
+      {/* Search */}
+      <input
+        type="text"
+        placeholder="Cerca allenamento per nome…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        style={{ ...styles.input, width: "100%", marginBottom: 10 }}
+      />
 
-      <div style={{ marginTop: 12, textAlign: "center" }}>
-        <button style={styles.linkBtn} onClick={() => setIsRegister((v) => !v)}>
-          {isRegister ? "Hai già un account? Accedi" : "Non hai un account? Registrati"}
-        </button>
+      {/* Percorso di oggi (facoltativo) */}
+      <button style={styles.buttonPrimary} onClick={onPercorso}>
+        Percorso di oggi
+      </button>
+
+      {/* Lista unica (uno sotto l'altro) */}
+      <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+        {list.map((it) => (
+          <WorkoutRow key={it.id} item={it} onStart={() => onStartWorkout(it)} />
+        ))}
+        {list.length === 0 && (
+          <div style={{ color: COLORS.muted, marginTop: 8 }}>Nessun allenamento trovato.</div>
+        )}
+      </div>
+
+      {/* Link rapido area personale */}
+      <div style={{ marginTop: 12 }}>
+        <span style={{ color: COLORS.muted, fontSize: 13 }}>
+          Vuoi personalizzare il percorso?
+        </span>{" "}
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            alert("Apri il menu ≡ in alto a destra → Area Personale");
+          }}
+          style={{ color: COLORS.brand, textDecoration: "underline" }}
+        >
+          Vai in Area Personale
+        </a>
       </div>
     </div>
   );
 }
 
 /* ==============================
-   Schermate
+   Percorso di oggi (singolo, personalizzato se possibile)
 ============================== */
-function HomeScreen({ user, onAllenati, onAreaPersonale }) {
+function PercorsoOggi({ user, onStart, onBack }) {
+  const plan = useMemo(() => generatePersonalizedSession(user), [user]);
   return (
     <div style={styles.card}>
-      <h2 style={{ ...styles.title, marginBottom: 8 }}>
-        Benvenuto {user?.name && user?.surname ? `${user.name} ${user.surname}` : ""}!
-      </h2>
-      <div style={{ color: COLORS.muted, marginBottom: 16 }}>
-        Cosa vuoi fare oggi?
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <div style={styles.homeTile}>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>Percorso di oggi</div>
-          <div style={{ color: COLORS.muted, fontSize: 13, marginBottom: 10 }}>
-            Vedi il percorso consigliato in base al tuo profilo.
-          </div>
-          <button
-            style={styles.buttonSecondary}
-            onClick={() => alert("Percorso di oggi: funzionalità in arrivo")}
-          >
-            Apri
-          </button>
-        </div>
-        <div style={styles.homeTile}>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>Allenati</div>
-          <div style={{ color: COLORS.muted, fontSize: 13, marginBottom: 10 }}>
-            Esplora tutti gli allenamenti della piattaforma.
-          </div>
-          <button style={styles.buttonPrimary} onClick={onAllenati}>
-            Vai agli allenamenti
-          </button>
-        </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h3 style={styles.title}>Allenamento di oggi</h3>
+        <button style={styles.buttonTertiary} onClick={onBack}>
+          Torna alla Home
+        </button>
       </div>
 
-      <div style={{ marginTop: 16 }}>
-        <button style={styles.linkBtn} onClick={onAreaPersonale}>
-          Vai alla tua Area Personale
-        </button>
+      <div style={{ color: COLORS.muted, marginBottom: 10 }}>
+        {plan.subtitle}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {plan.blocks.map((b, i) => (
+          <div key={i} style={styles.workoutCard}>
+            <div>
+              <div style={{ fontWeight: 600 }}>{b.name}</div>
+              <div style={{ color: COLORS.muted, fontSize: 13 }}>{b.minutes} min</div>
+            </div>
+            <button
+              style={styles.buttonSecondarySmall}
+              onClick={() => onStart({ id: 1000 + i, name: b.name })}
+            >
+              Avvia
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
+function generatePersonalizedSession(user) {
+  // Scelgo priorità ruolo: 11 poi 5
+  const role = user?.role11 || user?.role5 || null;
+  const prefDur = Number(user?.preferredDuration) || 45; // default se non presente
+  // Creo una seduta singola in blocchi
+  let focus = "generale";
+  if (role) {
+    if (["Attaccante", "Ala", "Pivot"].includes(role)) focus = "finalizzazione";
+    else if (["Difensore", "Terzino", "Difensore centrale"].includes(role)) focus = "difesa";
+    else if (["Centrocampista centrale", "Universale", "Trequartista"].includes(role)) focus = "costruzione";
+    else if (role === "Portiere") focus = "portiere";
+  }
+
+  // Ripartizione minuti semplice
+  const total = prefDur;
+  const blocks = [];
+  const push = (name, m) => blocks.push({ name, minutes: m });
+
+  const warm = Math.max(8, Math.round(total * 0.2));
+  const cool = Math.max(5, Math.round(total * 0.15));
+  let core = Math.max(10, total - warm - cool);
+
+  push("Riscaldamento", warm);
+
+  if (focus === "finalizzazione") {
+    push("1v1 + conclusione", Math.round(core * 0.5));
+    push("Tiro su scarico", Math.round(core * 0.5));
+  } else if (focus === "difesa") {
+    push("Coperture + scivolamenti", Math.round(core * 0.5));
+    push("Duelli difensivi", Math.round(core * 0.5));
+  } else if (focus === "costruzione") {
+    push("Rondos 4v2", Math.round(core * 0.5));
+    push("Uscita palla dal basso", Math.round(core * 0.5));
+  } else if (focus === "portiere") {
+    push("Balzi + riflessi", Math.round(core * 0.5));
+    push("Presa alta + rilanci", Math.round(core * 0.5));
+  } else {
+    push("Tecnica con palla", Math.round(core * 0.5));
+    push("Resistenza specifica", Math.round(core * 0.5));
+  }
+
+  push("Defaticamento + stretching", cool);
+
+  return {
+    subtitle: `Seduta ${
+      role ? `per ruolo: ${role}` : "generale"
+    } • Durata consigliata: ${total} min`,
+    blocks,
+  };
+}
+
+/* ==============================
+   Lista Allenamenti (usata in /workouts)
+============================== */
+function WorkoutsList({ workouts, onStart }) {
+  const [q, setQ] = useState("");
+  const list = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return workouts;
+    return workouts.filter((w) => w.name.toLowerCase().includes(s));
+  }, [q, workouts]);
+
+  return (
+    <div style={styles.card}>
+      <h3 style={styles.title}>Allenamenti</h3>
+      <input
+        type="text"
+        placeholder="Cerca…"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        style={{ ...styles.input, width: "100%", marginTop: 8, marginBottom: 10 }}
+      />
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {list.map((w) => (
+          <WorkoutRow key={w.id} item={w} onStart={() => onStart(w)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WorkoutRow({ item, onStart }) {
+  return (
+    <div style={styles.workoutCard}>
+      <div>
+        <div style={{ fontWeight: 600 }}>{item.name}</div>
+        <div style={{ color: COLORS.muted, fontSize: 13 }}>
+          Seleziona la durata quando avvii
+        </div>
+      </div>
+      <button style={styles.buttonSecondarySmall} onClick={onStart}>
+        Avvia
+      </button>
+    </div>
+  );
+}
+
+/* ==============================
+   Runner Allenamento (cronometro)
+============================== */
+function WorkoutRunner({ workout, minutes, onExit }) {
+  const [seconds, setSeconds] = useState(minutes * 60);
+  const [running, setRunning] = useState(false);
+
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setSeconds((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(id);
+  }, [running]);
+
+  useEffect(() => {
+    if (seconds === 0 && running) {
+      setRunning(false);
+      alert("Allenamento completato! 🎉");
+    }
+  }, [seconds, running]);
+
+  const fmt = (s) => {
+    const m = Math.floor(s / 60)
+      .toString()
+      .padStart(2, "0");
+    const ss = (s % 60).toString().padStart(2, "0");
+    return `${m}:${ss}`;
+  };
+
+  return (
+    <div style={styles.card}>
+      <h3 style={styles.title}>🏁 {workout.name}</h3>
+      <div style={{ fontSize: 48, fontWeight: 800, textAlign: "center", margin: "12px 0" }}>
+        {fmt(seconds)}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+        {!running ? (
+          <button style={styles.buttonPrimary} onClick={() => setRunning(true)}>
+            Start
+          </button>
+        ) : (
+          <button style={styles.buttonSecondary} onClick={() => setRunning(false)}>
+            Pausa
+          </button>
+        )}
+        <button
+          style={styles.buttonTertiary}
+          onClick={() => {
+            setRunning(false);
+            setSeconds(minutes * 60);
+          }}
+        >
+          Reset
+        </button>
+        <button style={styles.buttonTertiary} onClick={onExit}>
+          Esci
+        </button>
+      </div>
+
+      <div style={{ marginTop: 12, color: COLORS.muted, textAlign: "center" }}>
+        Durata impostata: {minutes} min • Rimasto: {Math.ceil(seconds / 60)} min
+      </div>
+    </div>
+  );
+}
+
+/* ==============================
+   Popup Selezione Durata
+============================== */
+function DurationPicker({ onClose, onChoose }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const quick = [5, 10, 15, 20, 30];
+  const [custom, setCustom] = useState("");
+
+  return (
+    <div style={styles.modalBackdrop}>
+      <div style={styles.modal} ref={ref}>
+        <h3 style={styles.title}>Seleziona la durata</h3>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+          {quick.map((m) => (
+            <button key={m} style={styles.buttonSecondary} onClick={() => onChoose(m)}>
+              {m} min
+            </button>
+          ))}
+        </div>
+
+        <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+          <input
+            type="number"
+            min={1}
+            placeholder="Minuti personalizzati"
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            style={{ ...styles.input, width: 180 }}
+          />
+          <button
+            style={styles.buttonPrimary}
+            onClick={() => {
+              const n = Number(custom);
+              if (!n || n <= 0) {
+                alert("Inserisci un numero di minuti valido");
+                return;
+              }
+              onChoose(n);
+            }}
+          >
+            Avvia
+          </button>
+          <button style={styles.buttonTertiary} onClick={onClose}>
+            Annulla
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ==============================
+   Area Personale
+============================== */
 function PersonalArea({ user, onSave }) {
   const [edit, setEdit] = useState(false);
   const [form, setForm] = useState(user || {});
 
-  useEffect(() => {
-    setForm(user || {});
-  }, [user]);
+  useEffect(() => setForm(user || {}), [user]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Campi obbligatori (ruoli e squadra sono FACOLTATIVI)
-    if (
-      !form.name ||
-      !form.surname ||
-      !form.email ||
-      !form.height ||
-      !form.weight ||
-      !form.birthdate
-    ) {
-      alert("Compila tutti i campi obbligatori: nome, cognome, email, altezza, peso, data di nascita.");
-      return;
-    }
+    // Adesso TUTTO è facoltativo tranne i dati di base (nome/cognome/email restano consigliati, ma non forzo qui)
     onSave(form);
     setEdit(false);
   };
@@ -435,8 +724,10 @@ function PersonalArea({ user, onSave }) {
           <Info label="Peso (kg)" value={form.weight} />
           <Info label="Data di nascita" value={form.birthdate} />
           <Info label="Squadra (facoltativa)" value={form.team} />
-          <Info label="Ruolo (Calcio a 11, facoltativo)" value={form.role11} />
-          <Info label="Ruolo (Calcio a 5, facoltativo)" value={form.role5} />
+          <Info label="Ruolo (11, facoltativo)" value={form.role11} />
+          <Info label="Ruolo (5, facoltativo)" value={form.role5} />
+          <Info label="Durata preferita (facoltativa)" value={form.preferredDuration ? `${form.preferredDuration} min` : ""} />
+          <Info label="Frequenza settimanale (facoltativa)" value={form.preferredFrequency ? `${form.preferredFrequency} giorni` : ""} />
         </div>
       ) : (
         <form
@@ -445,38 +736,38 @@ function PersonalArea({ user, onSave }) {
         >
           <div style={styles.row}>
             <Input
-              label="Nome *"
+              label="Nome"
               value={form.name || ""}
               onChange={(v) => setForm({ ...form, name: v })}
             />
             <Input
-              label="Cognome *"
+              label="Cognome"
               value={form.surname || ""}
               onChange={(v) => setForm({ ...form, surname: v })}
             />
           </div>
           <Input
-            label="Email *"
+            label="Email"
             type="email"
             value={form.email || ""}
             onChange={(v) => setForm({ ...form, email: v })}
           />
           <div style={styles.row}>
             <Input
-              label="Altezza (cm) *"
+              label="Altezza (cm)"
               type="number"
               value={form.height || ""}
               onChange={(v) => setForm({ ...form, height: v })}
             />
             <Input
-              label="Peso (kg) *"
+              label="Peso (kg)"
               type="number"
               value={form.weight || ""}
               onChange={(v) => setForm({ ...form, weight: v })}
             />
           </div>
           <Input
-            label="Data di nascita *"
+            label="Data di nascita"
             type="date"
             value={form.birthdate || ""}
             onChange={(v) => setForm({ ...form, birthdate: v })}
@@ -486,6 +777,7 @@ function PersonalArea({ user, onSave }) {
             value={form.team || ""}
             onChange={(v) => setForm({ ...form, team: v })}
           />
+
           <div style={styles.row}>
             <Select
               label="Ruolo Calcio a 11 (facoltativo)"
@@ -497,463 +789,4 @@ function PersonalArea({ user, onSave }) {
             <Select
               label="Ruolo Calcio a 5 (facoltativo)"
               value={form.role5 || ""}
-              onChange={(v) => setForm({ ...form, role5: v })}
-              options={ROLES_5}
-              optional
-            />
-          </div>
-
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <button type="submit" style={styles.buttonPrimary}>
-              Salva
-            </button>
-            <button
-              type="button"
-              style={styles.buttonTertiary}
-              onClick={() => {
-                setForm(user || {});
-                setEdit(false);
-              }}
-            >
-              Annulla
-            </button>
-          </div>
-        </form>
-      )}
-
-      <div style={{ marginTop: 16, display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <a href="mailto:appcalcio1@gmail.com" style={styles.linkBtnLike}>
-          Invia feedback ✉️
-        </a>
-      </div>
-    </div>
-  );
-}
-
-/* ==============================
-   Allenamenti con Search (opzione C)
-============================== */
-function WorkoutsWithSearch() {
-  const [active, setActive] = useState(WORKOUT_SECTIONS[0].key);
-  const [query, setQuery] = useState("");
-
-  const normalizedQuery = query.trim().toLowerCase();
-
-  // Lista filtrata su TUTTE le sezioni quando c'è query
-  const filteredByQuery = useMemo(() => {
-    if (!normalizedQuery) return null;
-    const results = [];
-    for (const sec of WORKOUT_SECTIONS) {
-      for (const it of sec.items) {
-        if (it.name.toLowerCase().includes(normalizedQuery)) {
-          results.push({ ...it, sectionKey: sec.key, sectionLabel: sec.label });
-        }
-      }
-    }
-    return results;
-  }, [normalizedQuery]);
-
-  const activeSection = useMemo(
-    () => WORKOUT_SECTIONS.find((s) => s.key === active),
-    [active]
-  );
-
-  const searching = normalizedQuery.length > 0;
-
-  return (
-    <div style={styles.card}>
-      <h3 style={styles.title}>📋 Allenamenti</h3>
-
-      {/* Search bar */}
-      <div style={{ marginTop: 8, marginBottom: 10 }}>
-        <input
-          type="text"
-          placeholder="Cerca allenamento per nome…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          style={{ ...styles.input, width: "100%" }}
-        />
-        {searching && (
-          <div style={{ marginTop: 8, color: COLORS.muted, fontSize: 13 }}>
-            Risultati: {filteredByQuery?.length || 0}
-            {" "}-{" "}
-            <button
-              style={styles.linkBtn}
-              onClick={() => setQuery("")}
-              title="Pulisci ricerca"
-            >
-              Pulisci ricerca
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Se sto cercando → nascondi TAB e mostra lista unificata */}
-      {!searching ? (
-        <>
-          <div style={styles.tabsBar}>
-            {WORKOUT_SECTIONS.map((s) => (
-              <button
-                key={s.key}
-                style={{
-                  ...styles.tabBtn,
-                  ...(active === s.key ? styles.tabBtnActive : {}),
-                }}
-                onClick={() => setActive(s.key)}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-
-          <div
-            style={{
-              marginTop: 12,
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-              gap: 12,
-            }}
-          >
-            {activeSection?.items.map((it) => (
-              <WorkoutItem key={it.id} item={it} />
-            ))}
-          </div>
-        </>
-      ) : (
-        <>
-          {/* Lista unificata: raggruppo per sezione con intestazione visibile solo se ci sono match */}
-          {WORKOUT_SECTIONS.map((sec) => {
-            const matches = filteredByQuery.filter((x) => x.sectionKey === sec.key);
-            if (matches.length === 0) return null;
-            return (
-              <div key={sec.key} style={{ marginTop: 12 }}>
-                <div style={{ fontWeight: 700, marginBottom: 8 }}>{sec.label}</div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-                    gap: 12,
-                  }}
-                >
-                  {matches.map((it) => (
-                    <WorkoutItem key={`${sec.key}-${it.id}`} item={it} />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-          {filteredByQuery && filteredByQuery.length === 0 && (
-            <div style={{ marginTop: 12, color: COLORS.muted }}>
-              Nessun allenamento trovato.
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-function WorkoutItem({ item }) {
-  return (
-    <div style={styles.workoutCard}>
-      <div>
-        <div style={{ fontWeight: 600 }}>{item.name}</div>
-        <div style={{ color: COLORS.muted, fontSize: 13 }}>{item.duration}</div>
-      </div>
-      <button
-        style={styles.buttonSecondarySmall}
-        onClick={() => alert(`Apri dettaglio: ${item.name}`)}
-      >
-        Apri
-      </button>
-    </div>
-  );
-}
-
-/* ==============================
-   Menu popup
-============================== */
-function MenuPopup({ onClose, onArea, onHome, onWorkouts, onLogout }) {
-  const ref = useRef(null);
-
-  useEffect(() => {
-    function onDocClick(e) {
-      if (ref.current && !ref.current.contains(e.target)) onClose?.();
-    }
-    document.addEventListener("click", onDocClick);
-    return () => document.removeEventListener("click", onDocClick);
-  }, [onClose]);
-
-  return (
-    <div ref={ref} style={styles.popup}>
-      <button style={styles.popupItem} onClick={onHome}>Home</button>
-      <button style={styles.popupItem} onClick={onWorkouts}>Allenamenti</button>
-      <button style={styles.popupItem} onClick={onArea}>Area Personale</button>
-      <a
-        style={{ ...styles.popupItem, textDecoration: "none" }}
-        href="mailto:appcalcio1@gmail.com"
-      >
-        Invia Feedback
-      </a>
-      <hr style={{ margin: 0, border: 0, borderTop: `1px solid ${COLORS.border}` }} />
-      <button style={styles.popupItem} onClick={onLogout}>Esci</button>
-    </div>
-  );
-}
-
-/* ==============================
-   UI Atomi
-============================== */
-function Input({ label, value, onChange, type = "text" }) {
-  return (
-    <label style={styles.field}>
-      <span style={styles.fieldLabel}>{label}</span>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange?.(e.target.value)}
-        style={styles.input}
-      />
-    </label>
-  );
-}
-
-function Select({ label, value, onChange, options, optional = false }) {
-  return (
-    <label style={styles.field}>
-      <span style={styles.fieldLabel}>{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange?.(e.target.value)}
-        style={styles.input}
-      >
-        {/* opzionale: la prima voce vuota permette di lasciare il campo non valorizzato */}
-        <option value="">{optional ? "Nessuna selezione" : "Seleziona…"}</option>
-        {options.map((op) => (
-          <option key={op} value={op}>
-            {op}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function Info({ label, value }) {
-  return (
-    <div style={styles.infoBox}>
-      <div style={{ color: COLORS.muted, fontSize: 12 }}>{label}</div>
-      <div style={{ fontWeight: 600 }}>{value || "-"}</div>
-    </div>
-  );
-}
-
-function Footer({ onLogout }) {
-  return (
-    <div style={{ marginTop: 24, display: "flex", gap: 12, justifyContent: "center" }}>
-      <button style={styles.buttonTertiary} onClick={onLogout}>
-        Esci
-      </button>
-    </div>
-  );
-}
-
-/* ==============================
-   Helpers
-============================== */
-function isProfileComplete(u) {
-  if (!u) return false;
-  // Ruoli e squadra NON sono obbligatori
-  const required = ["name", "surname", "email", "height", "weight", "birthdate"];
-  return required.every((k) => u[k] && String(u[k]).trim() !== "");
-}
-
-/* ==============================
-   Stili inline (tema sportivo)
-============================== */
-const styles = {
-  app: {
-    minHeight: "100vh",
-    background: COLORS.bg,
-    color: COLORS.text,
-  },
-  container: {
-    maxWidth: 980,
-    margin: "0 auto",
-    padding: 20,
-    display: "flex",
-    flexDirection: "column",
-    gap: 16,
-  },
-  header: {
-    position: "sticky",
-    top: 0,
-    zIndex: 10,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "12px 16px",
-    background: COLORS.card,
-    borderBottom: `1px solid ${COLORS.border}`,
-  },
-  headerLeft: { fontWeight: 700, color: COLORS.brandDark },
-  headerRight: { position: "relative", display: "flex", alignItems: "center", gap: 8 },
-  hamburger: {
-    width: 40,
-    height: 36,
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 4,
-    borderRadius: 10,
-    background: COLORS.card,
-    border: `1px solid ${COLORS.border}`,
-    cursor: "pointer",
-  },
-  burgerLine: { width: 18, height: 2, background: COLORS.text, borderRadius: 2 },
-
-  popup: {
-    position: "absolute",
-    top: 44,
-    right: 0,
-    background: COLORS.card,
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 12,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
-    overflow: "hidden",
-    minWidth: 220,
-  },
-  popupItem: {
-    width: "100%",
-    textAlign: "left",
-    background: "transparent",
-    border: "none",
-    padding: "10px 14px",
-    cursor: "pointer",
-    color: COLORS.text,
-  },
-
-  title: { color: COLORS.brandDark, margin: 0 },
-  card: {
-    background: COLORS.card,
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 16,
-    padding: 16,
-  },
-  authCard: {
-    maxWidth: 420,
-    margin: "40px auto",
-    background: COLORS.card,
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 16,
-    padding: 18,
-  },
-  row: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
-  field: { display: "flex", flexDirection: "column", gap: 6 },
-  fieldLabel: { fontSize: 13, color: COLORS.muted },
-  input: {
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: `1px solid ${COLORS.border}`,
-    outline: "none",
-    background: "#fff",
-  },
-  infoBox: {
-    padding: 12,
-    borderRadius: 12,
-    background: "#fff",
-    border: `1px solid ${COLORS.border}`,
-  },
-
-  homeTile: {
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 14,
-    background: "#fff",
-    padding: 14,
-  },
-
-  tabsBar: {
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-    borderBottom: `1px solid ${COLORS.border}`,
-    paddingBottom: 8,
-  },
-  tabBtn: {
-    padding: "8px 12px",
-    borderRadius: 999,
-    border: `1px solid ${COLORS.border}`,
-    background: "#fff",
-    cursor: "pointer",
-  },
-  tabBtnActive: {
-    background: COLORS.brand,
-    color: "#fff",
-    borderColor: COLORS.brand,
-    fontWeight: 600,
-  },
-  workoutCard: {
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 14,
-    background: "#fff",
-    padding: 12,
-    display: "flex",
-    gap: 10,
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  buttonPrimary: {
-    padding: "10px 14px",
-    borderRadius: 12,
-    border: "none",
-    background: COLORS.brand,
-    color: "#fff",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-  buttonSecondary: {
-    padding: "8px 12px",
-    borderRadius: 12,
-    border: `1px solid ${COLORS.border}`,
-    background: "#fff",
-    cursor: "pointer",
-    fontWeight: 600,
-  },
-  buttonSecondarySmall: {
-    padding: "6px 10px",
-    borderRadius: 10,
-    border: `1px solid ${COLORS.border}`,
-    background: "#fff",
-    cursor: "pointer",
-    fontWeight: 600,
-  },
-  buttonTertiary: {
-    padding: "8px 10px",
-    borderRadius: 10,
-    border: `1px solid ${COLORS.border}`,
-    background: "transparent",
-    cursor: "pointer",
-  },
-  linkBtn: {
-    background: "transparent",
-    color: COLORS.brand,
-    border: "none",
-    cursor: "pointer",
-    textDecoration: "underline",
-    fontWeight: 600,
-  },
-  linkBtnLike: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "8px 12px",
-    borderRadius: 999,
-    border: `1px solid ${COLORS.border}`,
-    background: "#fff",
-    color: COLORS.text,
-    textDecoration: "none",
-    fontWeight: 600,
-  },
-};
+              onChange={(v)
