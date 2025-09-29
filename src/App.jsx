@@ -1,19 +1,20 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 /**
- * =========================================================
- *  App.jsx — versione finale
- *  - HOME: Search in alto → "Percorso di oggi" → lista allenamenti (uno sotto l'altro)
- *  - Percorso di oggi: FACOLTATIVO; se mancano dati → alert; altrimenti allenamento personalizzato singolo
- *  - Click allenamento: popup scelta durata → schermata con cronometro Start/Pausa/Stop
- *  - Area Personale: tutti i dati modificabili; Ruolo/Durata/Frequenza FACOLTATIVI
- *  - Menu ≡ invariato; Feedback via mailto:appcalcio1@gmail.com
- * =========================================================
+ * App.jsx — Vite + React
+ * Tema: Monocromatico chiaro (sfondo bianco, testo nero)
+ * Funzioni principali:
+ * - Login/Registrazione (demo, senza backend) → dati in localStorage
+ * - Home: barra di ricerca in alto, bottone "Percorso di oggi" (facoltativo), elenco di ~50 allenamenti uno sotto l'altro
+ * - Menu hamburger (≡): Home, Tutti gli allenamenti, Area personale, Invia feedback (mailto:appcalcio1@gmail.com), Logout
+ * - Area personale: dati visibili e modificabili (nome, cognome, email, altezza, peso, data di nascita, squadra (facoltativa), ruolo 11 (facoltativo), ruolo 5 (facoltativo), durata/frequenza preferite facoltative)
+ * - Percorso di oggi: crea una seduta singola basata su ruolo/durata preferita (se presenti) — altrimenti avvisa di completare i dati
+ * - Avvio allenamento: scelta durata (popup) → cronometro start/pausa/reset/esci
  */
 
-/* ==============================
-   Local Storage helpers
-============================== */
+// ==============================
+// Local Storage helpers
+// ==============================
 const LS_KEY = "aoo_app_user";
 function loadUser() {
   try {
@@ -30,17 +31,17 @@ function clearUser() {
   localStorage.removeItem(LS_KEY);
 }
 
-/* ==============================
-   Tema & Costanti
-============================== */
+// ==============================
+// Tema & Costanti
+// ==============================
 const COLORS = {
-  brand: "#25a244",
-  brandDark: "#1b6e1f",
-  bg: "#f8fdf8",
-  text: "#0f172a",
-  muted: "#6b7280",
-  card: "#ffffff",
-  border: "#e5e7eb",
+  brand: "#000000",      // Nero principale
+  brandDark: "#222222",  // Variante scura
+  bg: "#ffffff",         // Sfondo bianco
+  text: "#000000",       // Testo nero
+  muted: "#6b7280",      // Grigio per testi secondari
+  card: "#f9f9f9",       // Grigio molto chiaro per riquadri
+  border: "#e5e7eb",     // Bordo leggero
 };
 
 const ROLES_11 = [
@@ -54,7 +55,9 @@ const ROLES_11 = [
 ];
 const ROLES_5 = ["Portiere", "Difensore", "Laterale", "Pivot", "Universale"];
 
-/* ===== Allenamenti (base) per sezione ===== */
+// ==============================
+// Allenamenti (sezioni + generazione lista 50)
+// ==============================
 const WORKOUT_SECTIONS = [
   {
     key: "riscaldamento",
@@ -133,12 +136,10 @@ const WORKOUT_SECTIONS = [
   },
 ];
 
-/* ===== Costruisco una lista unica di ~50 allenamenti ===== */
 function buildAllWorkouts() {
   const base = WORKOUT_SECTIONS.flatMap((s) =>
     s.items.map((it) => ({ ...it, section: s.key, sectionLabel: s.label }))
   );
-  // Se meno di 50, riempio con varianti numerate
   let all = [...base];
   let id = 100;
   const names = [
@@ -172,20 +173,19 @@ function buildAllWorkouts() {
 }
 const ALL_WORKOUTS = buildAllWorkouts();
 
-/* ==============================
-   App
-============================== */
+// ==============================
+// App
+// ==============================
 export default function App() {
   const [user, setUser] = useState(null);
   const [screen, setScreen] = useState("login"); // login | home | workouts | area | percorso | workout
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Stato per allenamento attivo e durata scelta
+  // Allenamento attivo
   const [activeWorkout, setActiveWorkout] = useState(null);
   const [activeDuration, setActiveDuration] = useState(null);
-  const [durationPickerFor, setDurationPickerFor] = useState(null); // workout per il popup
+  const [durationPickerFor, setDurationPickerFor] = useState(null);
 
-  // Carica utente (se presente) e vai in HOME
   useEffect(() => {
     const u = loadUser();
     if (u) {
@@ -250,7 +250,6 @@ export default function App() {
     </div>
   );
 
-  // Navigazione principale
   return (
     <div style={styles.app}>
       {screen === "login" && (
@@ -273,13 +272,12 @@ export default function App() {
           <div style={styles.container}>
             <HomeScreenNew
               user={user}
-              onAreaPersonale={goArea}
               onPercorso={() => {
-                // Percorso FACOLTATIVO: se mancano dati → alert e rimango in HOME
                 const hasSomeData =
-                  (user?.role11 || user?.role5 || null) ||
-                  user?.preferredDuration ||
-                  user?.preferredFrequency;
+                  Boolean(user?.role11) ||
+                  Boolean(user?.role5) ||
+                  Boolean(user?.preferredDuration) ||
+                  Boolean(user?.preferredFrequency);
                 if (!hasSomeData) {
                   alert(
                     "Per generare il tuo percorso personalizzato, completa i dati nell’Area Personale (ruolo / durata / frequenza). Oppure continua ad allenarti liberamente dalla lista!"
@@ -297,7 +295,7 @@ export default function App() {
 
       {screen === "workouts" && (
         <>
-          <Header title="Allenamenti" />
+          <Header title="Tutti gli allenamenti" />
           <div style={styles.container}>
             <WorkoutsList
               workouts={ALL_WORKOUTS}
@@ -312,10 +310,7 @@ export default function App() {
         <>
           <Header title="Area Personale" />
           <div style={styles.container}>
-            <PersonalArea
-              user={user}
-              onSave={(updated) => setUser(updated)}
-            />
+            <PersonalArea user={user} onSave={(u) => setUser(u)} />
             <Footer onLogout={handleLogout} />
           </div>
         </>
@@ -328,7 +323,7 @@ export default function App() {
             <PercorsoOggi
               user={user}
               onStart={(w) => setDurationPickerFor(w)}
-              onBack={goHome}
+              onBack={() => setScreen("home")}
             />
           </div>
         </>
@@ -351,7 +346,6 @@ export default function App() {
         </>
       )}
 
-      {/* Popup selezione durata */}
       {durationPickerFor && (
         <DurationPicker
           onClose={() => setDurationPickerFor(null)}
@@ -367,10 +361,172 @@ export default function App() {
   );
 }
 
-/* ==============================
-   HOME nuova (search + percorso + lista unica)
-============================== */
-function HomeScreenNew({ user, onPercorso, onStartWorkout }) {
+// ==============================
+// Menu Popup
+// ==============================
+function MenuPopup({ onClose, onArea, onHome, onWorkouts, onLogout }) {
+  return (
+    <div style={styles.menu}>
+      <button style={styles.menuItem} onClick={onHome}>🏠 Home</button>
+      <button style={styles.menuItem} onClick={onWorkouts}>📋 Tutti gli allenamenti</button>
+      <button style={styles.menuItem} onClick={onArea}>👤 Area personale</button>
+      <a
+        href="mailto:appcalcio1@gmail.com?subject=Feedback%20app&body=Ciao%2C%20vorrei%20segnalare..."
+        style={{ ...styles.menuItem, textDecoration: "none" }}
+      >
+        ✉️ Invia feedback
+      </a>
+      <button style={styles.menuItemDanger} onClick={onLogout}>🚪 Logout</button>
+      <button style={styles.menuClose} onClick={onClose}>Chiudi ✕</button>
+    </div>
+  );
+}
+
+// ==============================
+// Auth (Login / Registrazione)
+// ==============================
+function Auth({ onLogin }) {
+  const [mode, setMode] = useState("new"); // new | existing
+  const [form, setForm] = useState({
+    name: "",
+    surname: "",
+    email: "",
+    password: "",
+  });
+
+  const submitNew = (e) => {
+    e.preventDefault();
+    if (!form.email || !form.password || !form.name || !form.surname) {
+      alert("Compila Nome, Cognome, Email e Password.");
+      return;
+    }
+    const user = {
+      name: form.name,
+      surname: form.surname,
+      email: form.email,
+      height: "",
+      weight: "",
+      birthdate: "",
+      team: "",
+      role11: "",
+      role5: "",
+      preferredDuration: "",
+      preferredFrequency: "",
+    };
+    saveUser(user);
+    onLogin(user);
+  };
+
+  const submitExisting = (e) => {
+    e.preventDefault();
+    if (!form.email || !form.password) {
+      alert("Inserisci Email e Password.");
+      return;
+    }
+    const saved = loadUser();
+    if (saved && saved.email === form.email) {
+      onLogin(saved);
+    } else {
+      const newUser = {
+        name: form.name || "Utente",
+        surname: form.surname || "",
+        email: form.email,
+        height: "",
+        weight: "",
+        birthdate: "",
+        team: "",
+        role11: "",
+        role5: "",
+        preferredDuration: "",
+        preferredFrequency: "",
+      };
+      saveUser(newUser);
+      onLogin(newUser);
+    }
+  };
+
+  return (
+    <div style={styles.card}>
+      <div style={styles.tabs}>
+        <button
+          onClick={() => setMode("new")}
+          style={mode === "new" ? styles.tabActive : styles.tab}
+        >
+          Nuovo utente
+        </button>
+        <button
+          onClick={() => setMode("existing")}
+          style={mode === "existing" ? styles.tabActive : styles.tab}
+        >
+          Utente esistente
+        </button>
+      </div>
+
+      {mode === "new" ? (
+        <form onSubmit={submitNew} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={styles.row}>
+            <Input
+              label="Nome"
+              value={form.name}
+              onChange={(v) => setForm({ ...form, name: v })}
+            />
+            <Input
+              label="Cognome"
+              value={form.surname}
+              onChange={(v) => setForm({ ...form, surname: v })}
+            />
+          </div>
+          <Input
+            label="Email"
+            type="email"
+            value={form.email}
+            onChange={(v) => setForm({ ...form, email: v })}
+          />
+          <Input
+            label="Password"
+            type="password"
+            value={form.password}
+            onChange={(v) => setForm({ ...form, password: v })}
+          />
+          <button type="submit" style={styles.buttonPrimary}>Registrati</button>
+        </form>
+      ) : (
+        <form onSubmit={submitExisting} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <Input
+            label="Email"
+            type="email"
+            value={form.email}
+            onChange={(v) => setForm({ ...form, email: v })}
+          />
+          <Input
+            label="Password"
+            type="password"
+            value={form.password}
+            onChange={(v) => setForm({ ...form, password: v })}
+          />
+          <div style={styles.row}>
+            <Input
+              label="Nome (opzionale)"
+              value={form.name}
+              onChange={(v) => setForm({ ...form, name: v })}
+            />
+            <Input
+              label="Cognome (opzionale)"
+              value={form.surname}
+              onChange={(v) => setForm({ ...form, surname: v })}
+            />
+          </div>
+          <button type="submit" style={styles.buttonPrimary}>Accedi</button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+// ==============================
+/* HOME nuova: search + Percorso + lista unica */
+// ==============================
+function HomeScreenNew({ onPercorso, onStartWorkout }) {
   const [query, setQuery] = useState("");
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -380,7 +536,6 @@ function HomeScreenNew({ user, onPercorso, onStartWorkout }) {
 
   return (
     <div style={styles.card}>
-      {/* Search */}
       <input
         type="text"
         placeholder="Cerca allenamento per nome…"
@@ -389,12 +544,10 @@ function HomeScreenNew({ user, onPercorso, onStartWorkout }) {
         style={{ ...styles.input, width: "100%", marginBottom: 10 }}
       />
 
-      {/* Percorso di oggi (facoltativo) */}
       <button style={styles.buttonPrimary} onClick={onPercorso}>
         Percorso di oggi
       </button>
 
-      {/* Lista unica (uno sotto l'altro) */}
       <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
         {list.map((it) => (
           <WorkoutRow key={it.id} item={it} onStart={() => onStartWorkout(it)} />
@@ -403,30 +556,13 @@ function HomeScreenNew({ user, onPercorso, onStartWorkout }) {
           <div style={{ color: COLORS.muted, marginTop: 8 }}>Nessun allenamento trovato.</div>
         )}
       </div>
-
-      {/* Link rapido area personale */}
-      <div style={{ marginTop: 12 }}>
-        <span style={{ color: COLORS.muted, fontSize: 13 }}>
-          Vuoi personalizzare il percorso?
-        </span>{" "}
-        <a
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            alert("Apri il menu ≡ in alto a destra → Area Personale");
-          }}
-          style={{ color: COLORS.brand, textDecoration: "underline" }}
-        >
-          Vai in Area Personale
-        </a>
-      </div>
     </div>
   );
 }
 
-/* ==============================
-   Percorso di oggi (singolo, personalizzato se possibile)
-============================== */
+// ==============================
+// Percorso di oggi
+// ==============================
 function PercorsoOggi({ user, onStart, onBack }) {
   const plan = useMemo(() => generatePersonalizedSession(user), [user]);
   return (
@@ -463,10 +599,8 @@ function PercorsoOggi({ user, onStart, onBack }) {
 }
 
 function generatePersonalizedSession(user) {
-  // Scelgo priorità ruolo: 11 poi 5
   const role = user?.role11 || user?.role5 || null;
-  const prefDur = Number(user?.preferredDuration) || 45; // default se non presente
-  // Creo una seduta singola in blocchi
+  const prefDur = Number(user?.preferredDuration) || 45;
   let focus = "generale";
   if (role) {
     if (["Attaccante", "Ala", "Pivot"].includes(role)) focus = "finalizzazione";
@@ -474,8 +608,6 @@ function generatePersonalizedSession(user) {
     else if (["Centrocampista centrale", "Universale", "Trequartista"].includes(role)) focus = "costruzione";
     else if (role === "Portiere") focus = "portiere";
   }
-
-  // Ripartizione minuti semplice
   const total = prefDur;
   const blocks = [];
   const push = (name, m) => blocks.push({ name, minutes: m });
@@ -485,7 +617,6 @@ function generatePersonalizedSession(user) {
   let core = Math.max(10, total - warm - cool);
 
   push("Riscaldamento", warm);
-
   if (focus === "finalizzazione") {
     push("1v1 + conclusione", Math.round(core * 0.5));
     push("Tiro su scarico", Math.round(core * 0.5));
@@ -502,20 +633,17 @@ function generatePersonalizedSession(user) {
     push("Tecnica con palla", Math.round(core * 0.5));
     push("Resistenza specifica", Math.round(core * 0.5));
   }
-
   push("Defaticamento + stretching", cool);
 
   return {
-    subtitle: `Seduta ${
-      role ? `per ruolo: ${role}` : "generale"
-    } • Durata consigliata: ${total} min`,
+    subtitle: `Seduta ${role ? `per ruolo: ${role}` : "generale"} • Durata consigliata: ${total} min`,
     blocks,
   };
 }
 
-/* ==============================
-   Lista Allenamenti (usata in /workouts)
-============================== */
+// ==============================
+// Lista allenamenti
+// ==============================
 function WorkoutsList({ workouts, onStart }) {
   const [q, setQ] = useState("");
   const list = useMemo(() => {
@@ -548,20 +676,63 @@ function WorkoutRow({ item, onStart }) {
     <div style={styles.workoutCard}>
       <div>
         <div style={{ fontWeight: 600 }}>{item.name}</div>
-        <div style={{ color: COLORS.muted, fontSize: 13 }}>
-          Seleziona la durata quando avvii
-        </div>
+        <div style={{ color: COLORS.muted, fontSize: 13 }}>Seleziona la durata quando avvii</div>
       </div>
-      <button style={styles.buttonSecondarySmall} onClick={onStart}>
-        Avvia
-      </button>
+      <button style={styles.buttonSecondarySmall} onClick={onStart}>Avvia</button>
     </div>
   );
 }
 
-/* ==============================
-   Runner Allenamento (cronometro)
-============================== */
+// ==============================
+// Duration Picker (popup)
+// ==============================
+function DurationPicker({ onClose, onChoose }) {
+  const preset = [10, 15, 20, 25, 30, 35, 40, 45, 50, 60];
+  const [custom, setCustom] = useState("");
+
+  return (
+    <div style={styles.modalBackdrop} onClick={onClose}>
+      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <h3 style={styles.title}>Scegli durata (minuti)</h3>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+          {preset.map((m) => (
+            <button key={m} style={styles.buttonSecondary} onClick={() => onChoose(m)}>
+              {m}′
+            </button>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            type="number"
+            min="5"
+            max="180"
+            placeholder="Personalizzata"
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            style={{ ...styles.input, flex: 1 }}
+          />
+          <button
+            style={styles.buttonPrimary}
+            onClick={() => {
+              const n = Number(custom);
+              if (!n || n < 5) return alert("Inserisci un numero valido (>=5).");
+              onChoose(n);
+            }}
+          >
+            OK
+          </button>
+        </div>
+        <div style={{ marginTop: 10, textAlign: "right" }}>
+          <button style={styles.buttonTertiary} onClick={onClose}>Annulla</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==============================
+// Workout Runner (cronometro)
+// ==============================
 function WorkoutRunner({ workout, minutes, onExit }) {
   const [seconds, setSeconds] = useState(minutes * 60);
   const [running, setRunning] = useState(false);
@@ -580,9 +751,7 @@ function WorkoutRunner({ workout, minutes, onExit }) {
   }, [seconds, running]);
 
   const fmt = (s) => {
-    const m = Math.floor(s / 60)
-      .toString()
-      .padStart(2, "0");
+    const m = Math.floor(s / 60).toString().padStart(2, "0");
     const ss = (s % 60).toString().padStart(2, "0");
     return `${m}:${ss}`;
   };
@@ -617,176 +786,336 @@ function WorkoutRunner({ workout, minutes, onExit }) {
           Esci
         </button>
       </div>
-
-      <div style={{ marginTop: 12, color: COLORS.muted, textAlign: "center" }}>
-        Durata impostata: {minutes} min • Rimasto: {Math.ceil(seconds / 60)} min
-      </div>
     </div>
   );
 }
 
-/* ==============================
-   Popup Selezione Durata
-============================== */
-function DurationPicker({ onClose, onChoose }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  const quick = [5, 10, 15, 20, 30];
-  const [custom, setCustom] = useState("");
-
-  return (
-    <div style={styles.modalBackdrop}>
-      <div style={styles.modal} ref={ref}>
-        <h3 style={styles.title}>Seleziona la durata</h3>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
-          {quick.map((m) => (
-            <button key={m} style={styles.buttonSecondary} onClick={() => onChoose(m)}>
-              {m} min
-            </button>
-          ))}
-        </div>
-
-        <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-          <input
-            type="number"
-            min={1}
-            placeholder="Minuti personalizzati"
-            value={custom}
-            onChange={(e) => setCustom(e.target.value)}
-            style={{ ...styles.input, width: 180 }}
-          />
-          <button
-            style={styles.buttonPrimary}
-            onClick={() => {
-              const n = Number(custom);
-              if (!n || n <= 0) {
-                alert("Inserisci un numero di minuti valido");
-                return;
-              }
-              onChoose(n);
-            }}
-          >
-            Avvia
-          </button>
-          <button style={styles.buttonTertiary} onClick={onClose}>
-            Annulla
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ==============================
-   Area Personale
-============================== */
+// ==============================
+// Area Personale
+// ==============================
 function PersonalArea({ user, onSave }) {
-  const [edit, setEdit] = useState(false);
-  const [form, setForm] = useState(user || {});
+  const [form, setForm] = useState(
+    user || {
+      name: "",
+      surname: "",
+      email: "",
+      height: "",
+      weight: "",
+      birthdate: "",
+      team: "",
+      role11: "",
+      role5: "",
+      preferredDuration: "",
+      preferredFrequency: "",
+    }
+  );
 
-  useEffect(() => setForm(user || {}), [user]);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Adesso TUTTO è facoltativo tranne i dati di base (nome/cognome/email restano consigliati, ma non forzo qui)
-    onSave(form);
-    setEdit(false);
-  };
+  const update = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   return (
     <div style={styles.card}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h3 style={styles.title}>👤 Area Personale</h3>
-        {!edit && (
-          <button style={styles.buttonSecondary} onClick={() => setEdit(true)}>
-            Modifica profilo
-          </button>
-        )}
+      <h3 style={styles.title}>Dati personali</h3>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <Input label="Nome" value={form.name || ""} onChange={(v) => update("name", v)} />
+        <Input label="Cognome" value={form.surname || ""} onChange={(v) => update("surname", v)} />
       </div>
 
-      {!edit ? (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: 12,
+      <Input label="Email" type="email" value={form.email || ""} onChange={(v) => update("email", v)} />
+
+      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <Input label="Altezza (cm)" value={form.height || ""} onChange={(v) => update("height", v)} />
+        <Input label="Peso (kg)" value={form.weight || ""} onChange={(v) => update("weight", v)} />
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <Input label="Data di nascita" type="date" value={form.birthdate || ""} onChange={(v) => update("birthdate", v)} />
+        <Input label="Squadra (facoltativa)" value={form.team || ""} onChange={(v) => update("team", v)} />
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <Select label="Ruolo calcio a 11 (facoltativo)" value={form.role11 || ""} onChange={(v) => update("role11", v)} options={ROLES_11} />
+        <Select label="Ruolo calcio a 5 (facoltativo)" value={form.role5 || ""} onChange={(v) => update("role5", v)} options={ROLES_5} />
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <Input label="Durata preferita (min, facoltativo)" type="number" value={form.preferredDuration || ""} onChange={(v) => update("preferredDuration", v)} />
+        <Input label="Frequenza settimanale (n°, facoltativa)" type="number" value={form.preferredFrequency || ""} onChange={(v) => update("preferredFrequency", v)} />
+      </div>
+
+      <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+        <button
+          style={styles.buttonPrimary}
+          onClick={() => {
+            onSave(form);
+            alert("Dati salvati!");
           }}
         >
+          Salva
+        </button>
+        <a
+          href="mailto:appcalcio1@gmail.com?subject=Feedback%20area%20personale&body=Ciao%2C%20vorrei%20segnalare..."
+          style={{ ...styles.buttonTertiary, display: "inline-flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}
+        >
+          Invia feedback
+        </a>
+      </div>
+
+      <div style={{ marginTop: 16, borderTop: `1px solid ${COLORS.border}`, paddingTop: 10 }}>
+        <h4 style={{ margin: "0 0 8px", fontSize: 16 }}>Anteprima dati</h4>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, color: COLORS.muted }}>
           <Info label="Nome" value={form.name} />
           <Info label="Cognome" value={form.surname} />
           <Info label="Email" value={form.email} />
-          <Info label="Altezza (cm)" value={form.height} />
-          <Info label="Peso (kg)" value={form.weight} />
-          <Info label="Data di nascita" value={form.birthdate} />
-          <Info label="Squadra (facoltativa)" value={form.team} />
-          <Info label="Ruolo (11, facoltativo)" value={form.role11} />
-          <Info label="Ruolo (5, facoltativo)" value={form.role5} />
-          <Info label="Durata preferita (facoltativa)" value={form.preferredDuration ? `${form.preferredDuration} min` : ""} />
-          <Info label="Frequenza settimanale (facoltativa)" value={form.preferredFrequency ? `${form.preferredFrequency} giorni` : ""} />
+          <Info label="Altezza" value={form.height} />
+          <Info label="Peso" value={form.weight} />
+          <Info label="Nascita" value={form.birthdate} />
+          <Info label="Squadra" value={form.team} />
+          <Info label="Ruolo 11" value={form.role11} />
+          <Info label="Ruolo 5" value={form.role5} />
+          <Info label="Durata pref." value={form.preferredDuration} />
+          <Info label="Frequenza pref." value={form.preferredFrequency} />
         </div>
-      ) : (
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: "flex", flexDirection: "column", gap: 12 }}
-        >
-          <div style={styles.row}>
-            <Input
-              label="Nome"
-              value={form.name || ""}
-              onChange={(v) => setForm({ ...form, name: v })}
-            />
-            <Input
-              label="Cognome"
-              value={form.surname || ""}
-              onChange={(v) => setForm({ ...form, surname: v })}
-            />
-          </div>
-          <Input
-            label="Email"
-            type="email"
-            value={form.email || ""}
-            onChange={(v) => setForm({ ...form, email: v })}
-          />
-          <div style={styles.row}>
-            <Input
-              label="Altezza (cm)"
-              type="number"
-              value={form.height || ""}
-              onChange={(v) => setForm({ ...form, height: v })}
-            />
-            <Input
-              label="Peso (kg)"
-              type="number"
-              value={form.weight || ""}
-              onChange={(v) => setForm({ ...form, weight: v })}
-            />
-          </div>
-          <Input
-            label="Data di nascita"
-            type="date"
-            value={form.birthdate || ""}
-            onChange={(v) => setForm({ ...form, birthdate: v })}
-          />
-          <Input
-            label="Squadra (facoltativa)"
-            value={form.team || ""}
-            onChange={(v) => setForm({ ...form, team: v })}
-          />
+      </div>
+    </div>
+  );
+}
 
-          <div style={styles.row}>
-            <Select
-              label="Ruolo Calcio a 11 (facoltativo)"
-              value={form.role11 || ""}
-              onChange={(v) => setForm({ ...form, role11: v })}
-              options={ROLES_11}
-              optional
-            />
-            <Select
-              label="Ruolo Calcio a 5 (facoltativo)"
-              value={form.role5 || ""}
-              onChange={(v)
+// ==============================
+// Footer
+// ==============================
+function Footer({ onLogout }) {
+  return (
+    <div style={styles.footer}>
+      <button style={styles.buttonTertiary} onClick={onLogout}>Logout</button>
+    </div>
+  );
+}
+
+// ==============================
+// Input / Select / Info
+// ==============================
+function Input({ label, value, onChange, type = "text" }) {
+  return (
+    <label style={styles.inputGroup}>
+      <span style={styles.inputLabel}>{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={styles.input}
+      />
+    </label>
+  );
+}
+
+function Select({ label, value, onChange, options }) {
+  return (
+    <label style={styles.inputGroup}>
+      <span style={styles.inputLabel}>{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)} style={styles.input}>
+        <option value="">-- Seleziona --</option>
+        {options.map((opt, i) => (
+          <option key={i} value={opt}>{opt}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function Info({ label, value }) {
+  return (
+    <div>
+      <strong>{label}: </strong>
+      <span>{value || "-"}</span>
+    </div>
+  );
+}
+
+// ==============================
+// STYLES (inline)
+// ==============================
+const styles = {
+  app: {
+    minHeight: "100vh",
+    backgroundColor: COLORS.bg,
+    color: COLORS.text,
+    fontFamily: "Arial, sans-serif",
+  },
+  container: {
+    maxWidth: 600,
+    margin: "0 auto",
+    padding: 16,
+  },
+  card: {
+    backgroundColor: COLORS.card,
+    padding: 16,
+    borderRadius: 8,
+    boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+  },
+  header: {
+    backgroundColor: COLORS.brand,
+    color: "white",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "12px 16px",
+  },
+  headerLeft: { fontWeight: 600, fontSize: 16 },
+  headerRight: { position: "relative" },
+  hamburger: {
+    background: "transparent",
+    border: "none",
+    padding: 4,
+    cursor: "pointer",
+  },
+  burgerLine: {
+    display: "block",
+    width: 20,
+    height: 2,
+    backgroundColor: "white",
+    margin: "3px 0",
+  },
+  menu: {
+    position: "absolute",
+    top: 40,
+    right: 0,
+    backgroundColor: "white",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+    borderRadius: 8,
+    overflow: "hidden",
+    minWidth: 220,
+    zIndex: 10,
+  },
+  menuItem: {
+    display: "block",
+    padding: "10px 14px",
+    background: "white",
+    border: "none",
+    width: "100%",
+    textAlign: "left",
+    cursor: "pointer",
+  },
+  menuItemDanger: {
+    display: "block",
+    padding: "10px 14px",
+    background: "#fee2e2",
+    color: "#b91c1c",
+    border: "none",
+    width: "100%",
+    textAlign: "left",
+    cursor: "pointer",
+  },
+  menuClose: {
+    padding: "6px 14px",
+    background: COLORS.brand,
+    color: "white",
+    border: "none",
+    cursor: "pointer",
+    width: "100%",
+  },
+  title: { fontSize: 18, fontWeight: 700, marginBottom: 8 },
+  inputGroup: { display: "flex", flexDirection: "column", width: "100%" },
+  inputLabel: { fontSize: 14, fontWeight: 600, marginBottom: 4 },
+  input: {
+    padding: "8px 10px",
+    borderRadius: 6,
+    border: `1px solid ${COLORS.border}`,
+    fontSize: 14,
+    backgroundColor: "white",
+    color: COLORS.text,
+  },
+  row: { display: "flex", gap: 8 },
+  buttonPrimary: {
+    backgroundColor: COLORS.text,
+    color: "white",
+    padding: "8px 12px",
+    border: "none",
+    borderRadius: 6,
+    cursor: "pointer",
+    fontWeight: 600,
+  },
+  buttonSecondary: {
+    backgroundColor: COLORS.border,
+    color: COLORS.text,
+    padding: "8px 12px",
+    border: "none",
+    borderRadius: 6,
+    cursor: "pointer",
+  },
+  buttonSecondarySmall: {
+    backgroundColor: COLORS.border,
+    color: COLORS.text,
+    padding: "4px 8px",
+    border: "none",
+    borderRadius: 6,
+    cursor: "pointer",
+    fontSize: 12,
+  },
+  buttonTertiary: {
+    backgroundColor: "transparent",
+    color: COLORS.text,
+    padding: "6px 10px",
+    border: `1px solid ${COLORS.text}`,
+    borderRadius: 6,
+    cursor: "pointer",
+    fontSize: 12,
+  },
+  workoutCard: {
+    backgroundColor: COLORS.card,
+    border: `1px solid ${COLORS.border}`,
+    borderRadius: 6,
+    padding: 10,
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  footer: {
+    marginTop: 16,
+    textAlign: "center",
+  },
+  modalBackdrop: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 50,
+  },
+  modal: {
+    backgroundColor: COLORS.card,
+    padding: 20,
+    borderRadius: 8,
+    width: "90%",
+    maxWidth: 360,
+    boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
+  },
+  tabs: {
+    display: "flex",
+    marginBottom: 8,
+    gap: 6,
+  },
+  tab: {
+    flex: 1,
+    padding: "8px 12px",
+    textAlign: "center",
+    cursor: "pointer",
+    backgroundColor: COLORS.border,
+    border: "none",
+    borderRadius: 6,
+  },
+  tabActive: {
+    flex: 1,
+    padding: "8px 12px",
+    textAlign: "center",
+    cursor: "pointer",
+    backgroundColor: COLORS.text,
+    color: "white",
+    border: "none",
+    borderRadius: 6,
+  },
+};
