@@ -3,15 +3,15 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 /**
  * =========================================================
  *  App.jsx — versione completa (schema originale + richieste)
- *  - Login / Registrazione con LocalStorage
- *  - Dopo login:
- *      * se profilo incompleto → Area Personale (edit obbligatorio)
- *      * se completo → HOME (Benvenuto, Percorso di oggi, Allenati)
+ *  - Login / Registrazione (Email+Password; in registrazione anche Nome+Cognome)
+ *  - Dopo login/registrazione → HOME (non Area)
+ *  - HOME: Benvenuto, Percorso di oggi, Allenati
  *  - Area Personale: ruoli FACOLTATIVI + Squadra FACOLTATIVA
  *  - Allenamenti:
  *      * TAB per sezione
  *      * Search bar in alto: se scrivi → filtra TUTTA la piattaforma e nasconde le TAB
  *  - Menu hamburger ≡: Home, Allenamenti, Area Personale, Feedback, Logout
+ *  - Feedback email → appcalcio1@gmail.com
  * =========================================================
  */
 
@@ -118,7 +118,7 @@ export default function App() {
     const u = loadUser();
     if (u) {
       setUser(u);
-      setScreen(isProfileComplete(u) ? "home" : "area");
+      setScreen("home"); // vai sempre in HOME se utente presente
     }
   }, []);
 
@@ -188,7 +188,7 @@ export default function App() {
             <Auth
               onLogin={(u) => {
                 setUser(u);
-                setScreen(isProfileComplete(u) ? "home" : "area");
+                setScreen("home"); // dopo login/registrazione vai in HOME
               }}
             />
           </div>
@@ -227,14 +227,113 @@ export default function App() {
               user={user}
               onSave={(updated) => {
                 setUser(updated);
-                // Se era incompleto e ora completo → torna a HOME
-                if (isProfileComplete(updated)) setScreen("home");
               }}
             />
             <Footer onLogout={handleLogout} />
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/* ==============================
+   Componenti: Auth (Login/Registrazione)
+============================== */
+function Auth({ onLogin }) {
+  const [isRegister, setIsRegister] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    surname: "",
+    email: "",
+    password: "",
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.email || !form.password) {
+      alert("Email e password sono obbligatorie");
+      return;
+    }
+
+    const existing = loadUser();
+
+    if (isRegister) {
+      // Registrazione: includo già Nome + Cognome
+      const newUser = {
+        email: form.email.trim(),
+        password: form.password,
+        name: form.name.trim(),
+        surname: form.surname.trim(),
+        // Campi profilo (compilabili dopo in Area)
+        height: "",
+        weight: "",
+        birthdate: "",
+        team: "",
+        role11: "", // facoltativo
+        role5: "",  // facoltativo
+      };
+      saveUser(newUser);
+      onLogin(newUser);
+    } else {
+      if (!existing) {
+        alert("Nessun utente registrato. Crea un account.");
+        return;
+      }
+      if (
+        existing.email === form.email.trim() &&
+        existing.password === form.password
+      ) {
+        onLogin(existing);
+      } else {
+        alert("Credenziali errate");
+      }
+    }
+  };
+
+  return (
+    <div style={styles.authCard}>
+      <h2 style={styles.title}>{isRegister ? "Registrazione" : "Accesso"}</h2>
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: "flex", flexDirection: "column", gap: 12 }}
+      >
+        {isRegister && (
+          <div style={styles.row}>
+            <Input
+              label="Nome"
+              value={form.name}
+              onChange={(v) => setForm({ ...form, name: v })}
+            />
+            <Input
+              label="Cognome"
+              value={form.surname}
+              onChange={(v) => setForm({ ...form, surname: v })}
+            />
+          </div>
+        )}
+        <Input
+          label="Email"
+          type="email"
+          value={form.email}
+          onChange={(v) => setForm({ ...form, email: v })}
+        />
+        <Input
+          label="Password"
+          type="password"
+          value={form.password}
+          onChange={(v) => setForm({ ...form, password: v })}
+        />
+        <button type="submit" style={styles.buttonPrimary}>
+          {isRegister ? "Crea account" : "Entra"}
+        </button>
+      </form>
+
+      <div style={{ marginTop: 12, textAlign: "center" }}>
+        <button style={styles.linkBtn} onClick={() => setIsRegister((v) => !v)}>
+          {isRegister ? "Hai già un account? Accedi" : "Non hai un account? Registrati"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -285,7 +384,7 @@ function HomeScreen({ user, onAllenati, onAreaPersonale }) {
 }
 
 function PersonalArea({ user, onSave }) {
-  const [edit, setEdit] = useState(!isProfileComplete(user)); // se incompleto → edit obbligatorio
+  const [edit, setEdit] = useState(false);
   const [form, setForm] = useState(user || {});
 
   useEffect(() => {
@@ -408,15 +507,16 @@ function PersonalArea({ user, onSave }) {
             <button type="submit" style={styles.buttonPrimary}>
               Salva
             </button>
-            {!isProfileComplete(user) ? null : (
-              <button
-                type="button"
-                style={styles.buttonTertiary}
-                onClick={() => setEdit(false)}
-              >
-                Annulla
-              </button>
-            )}
+            <button
+              type="button"
+              style={styles.buttonTertiary}
+              onClick={() => {
+                setForm(user || {});
+                setEdit(false);
+              }}
+            >
+              Annulla
+            </button>
           </div>
         </form>
       )}
